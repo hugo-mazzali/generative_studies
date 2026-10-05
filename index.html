@@ -1,0 +1,2116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Three emergent rule systems (SmoothLife, reaction-diffusion, particle life) that grow shapes on their own, react to music, and turn songs into images.">
+<style>html,body{margin:0;padding:0}</style>
+<title>Emergence Studies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed live canvas; a solid control rail docked right (bottom sheet on phones). Single dark look by choice. */
+:root {
+  --ink: #141113;        /* warm near-black ground, like the poster stock */
+  --panel: #1d181b;
+  --line: #3a3036;
+  --text: #f1e7dc;       /* cream */
+  --muted: #a9988f;
+  --accent: #f6c453;     /* replaced live by the active palette */
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--ink); color: var(--text); overflow: hidden; font-family: var(--mono); font-size: 12px; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+
+#panel {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 16px); right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: 296px; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+  padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 18px;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+}
+#panel[hidden] { display: none !important; }
+.head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1.02; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 6px 0 0; line-height: 1.5; }
+h2 { font-family: var(--mono); font-weight: 500; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+section { display: flex; flex-direction: column; }
+
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.tabs button { background: transparent; color: var(--muted); border: 0; border-right: 1px solid var(--line); padding: 9px 4px 8px; font: 500 11px/1.2 var(--mono); cursor: pointer; }
+.tabs button:last-child { border-right: 0; }
+.tabs button[aria-selected="true"] { background: var(--text); color: var(--ink); }
+.tabs button .k { display: block; font-size: 9.5px; opacity: .6; margin-bottom: 2px; }
+.blurb { margin: 10px 0 0; line-height: 1.55; color: var(--text); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; font: 400 11px var(--mono); cursor: pointer; }
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+.ctl { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.ctl label { display: flex; justify-content: space-between; gap: 8px; }
+.ctl output { color: var(--muted); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; height: 18px; }
+.toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 4px; }
+.toggle input { accent-color: var(--accent); }
+
+.pals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+.pal { height: 26px; border-radius: 2px; border: 1px solid transparent; cursor: pointer; padding: 0; outline-offset: 2px; }
+.pal[aria-pressed="true"] { border-color: var(--text); box-shadow: 0 0 0 2px var(--ink) inset; }
+.palname { color: var(--muted); margin: -4px 0 12px; }
+
+.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.btn { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 3px; padding: 8px 4px; font: 500 11px var(--mono); cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--ink); border-color: var(--accent); }
+.brushrow { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.brushrow button { background: transparent; color: var(--muted); border: 0; padding: 7px 4px; font: 500 11px var(--mono); cursor: pointer; }
+.brushrow button + button { border-left: 1px solid var(--line); }
+.brushrow button[aria-pressed="true"] { color: var(--ink); background: var(--text); }
+.musicrow { display: grid; grid-template-columns: 1.25fr 1fr 0.8fr; gap: 6px; }
+.musicrow .btn { text-align: center; display: flex; align-items: center; justify-content: center; }
+.btn:disabled { opacity: .4; cursor: default; }
+.track { color: var(--muted); margin: 9px 0 8px; line-height: 1.5; overflow-wrap: anywhere; }
+.track.on { color: var(--text); }
+#meter { display: block; width: 100%; height: 30px; margin-bottom: 12px; }
+.portrait { display: flex; flex-direction: column; gap: 9px; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.portrait h2 { margin: 0; }
+.note { color: var(--muted); margin: 0; line-height: 1.5; }
+#prog { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 16px); left: 50%; transform: translateX(-50%); width: min(440px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; }
+#prog[hidden] { display: none !important; }
+.prow { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-variant-numeric: tabular-nums; }
+.pbar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.pbar i { display: block; height: 100%; width: 0; background: var(--accent); }
+.steer { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 6px 8px; align-items: center; color: var(--muted); font-size: 10.5px; }
+.steer b { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.swatch { height: 6px; border-radius: 2px; }
+.steer b i { display: block; height: 100%; width: 50%; background: var(--text); opacity: .8; }
+#result { position: fixed; inset: 0; background: rgba(12, 10, 11, 0.86); display: grid; place-items: center; padding: 24px 16px; }
+#result[hidden] { display: none !important; }
+.rcard { display: flex; flex-direction: column; gap: 12px; max-width: 100%; max-height: 100%; align-items: center; }
+#resimg { max-width: 100%; max-height: calc(100vh - 150px); object-fit: contain; border: 1px solid var(--line); background: var(--ink); }
+.ractions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.ractions p { color: var(--muted); margin: 0 6px 0 0; max-width: 46ch; }
+.ractions .btn { padding: 8px 14px; }
+#defbox { width: 100%; height: 70px; margin-top: 8px; background: var(--ink); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; font: 400 10.5px var(--mono); padding: 6px; resize: vertical; }
+.keys { color: var(--muted); line-height: 1.7; margin: 0; }
+.keys kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-radius: 2px; padding: 0 4px; color: var(--text); }
+.iconbtn { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 3px; font: 500 10.5px var(--mono); padding: 4px 7px; cursor: pointer; flex: none; }
+
+#show { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 16px); right: 16px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 3px; padding: 7px 11px; font: 500 11px var(--mono); cursor: pointer; }
+#hint { position: fixed; left: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); color: var(--text); opacity: .72; pointer-events: none; font-size: 11px; letter-spacing: .02em; max-width: calc(100% - 360px); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+#fps { position: fixed; left: 16px; top: calc(env(safe-area-inset-top, 0px) + 16px); color: var(--muted); font-size: 10.5px; pointer-events: none; font-variant-numeric: tabular-nums; }
+#err { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; line-height: 1.6; background: var(--ink); color: var(--text); font-size: 13px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 680px) {
+  #panel { left: 12px; right: 12px; top: auto; width: auto; max-height: 48%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+  #hint { max-width: calc(100% - 32px); bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 36px); }
+  h1 { font-size: 20px; }
+}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Live generative simulation. Drag on it to interact."></canvas>
+
+<aside id="panel" aria-label="Controls">
+  <div class="head">
+    <div>
+      <h1>Emergence Studies</h1>
+      <p class="sub">Three rule systems that grow shapes on their own.</p>
+    </div>
+    <button class="iconbtn" id="hide" title="Hide controls (H)">Hide</button>
+  </div>
+
+  <section>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <p class="blurb" id="blurb"></p>
+  </section>
+
+  <section>
+    <h2>Presets</h2>
+    <div class="chips" id="presets"></div>
+  </section>
+
+  <section>
+    <h2>Rules</h2>
+    <div id="rules"></div>
+  </section>
+
+  <section>
+    <h2>Mouse brush</h2>
+    <div class="brushrow" id="brush"></div>
+  </section>
+
+  <section>
+    <h2>Music</h2>
+    <div class="musicrow">
+      <label class="btn" for="song" id="songlabel" tabindex="0">Load a song</label>
+      <input type="file" id="song" accept="audio/*" hidden>
+      <button class="btn" id="demo">Demo beat</button>
+      <button class="btn" id="play" disabled>Play</button>
+    </div>
+    <p class="track" id="track">No music yet. Load an audio file from your computer (MP3, WAV, M4A), or try the demo beat.</p>
+    <canvas id="meter" aria-hidden="true"></canvas>
+    <div id="musicctl"></div>
+    <div class="portrait">
+      <h2>Song portrait</h2>
+      <p class="note" id="pnote"></p>
+      <div class="chips" id="pstyle"></div>
+      <label class="toggle"><input type="checkbox" id="autodir" checked> <span>Let the song choose the system and presets</span></label>
+      <div id="fluidctl"></div>
+      <div class="chips" id="framechips"></div>
+      <button class="btn primary" id="portrait" disabled>Make song portrait</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Look</h2>
+    <div class="pals" id="pals"></div>
+    <p class="palname" id="palname"></p>
+    <div id="look"></div>
+  </section>
+
+  <div class="actions">
+    <button class="btn primary" id="reseed">Reseed</button>
+    <button class="btn" id="pause">Pause</button>
+    <button class="btn" id="clear">Clear</button>
+  </div>
+  <section>
+    <h2>Defaults</h2>
+    <div class="actions">
+      <button class="btn" id="savedef">Save as default</button>
+      <button class="btn" id="copydef">Copy settings</button>
+      <button class="btn" id="resetdef">Reset</button>
+    </div>
+    <p class="note" id="defnote">Save as default makes the page open with your current settings in this browser.</p>
+    <textarea id="defbox" readonly hidden aria-label="Settings to copy"></textarea>
+  </section>
+  <p class="keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch system · <kbd>R</kbd> reseed · <kbd>Space</kbd> pause · <kbd>M</kbd> music on/off · <kbd>H</kbd> hide panel · hold <kbd>Shift</kbd> to flip the brush</p>
+</aside>
+<button id="show" hidden>Show controls</button>
+<div id="hint"></div>
+<div id="fps"></div>
+<div id="err" hidden></div>
+<div id="prog" hidden>
+  <div class="prow"><span id="progtext">Song portrait</span><button class="iconbtn" id="progcancel">Cancel</button></div>
+  <div class="pbar"><i id="pbarfill"></i></div>
+  <div class="steer"><span>Energy</span><b><i id="steerE"></i></b><span>Brightness</span><b><i id="steerC"></i></b></div>
+  <div class="swatch" id="swatch"></div>
+</div>
+<div id="result" hidden role="dialog" aria-label="Song portrait">
+  <div class="rcard">
+    <img id="resimg" alt="Song portrait: a grid of moments from the song">
+    <div class="ractions">
+      <p id="resnote"></p>
+      <button class="btn primary" id="ressave">Save image</button>
+      <button class="btn" id="resclose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------------- configuration ---------------- */
+const PALETTES = [
+  { name: "Heat map", stops: ["#1b2a86", "#3d6ae0", "#b9c3f2", "#e64a55", "#f5883a", "#ffd23f"] },
+  { name: "Poster", stops: ["#2c295c", "#7b4e9b", "#e57fa7", "#f08a4b", "#f6c453", "#f8e8d6"] },
+  { name: "Spectrum", stops: ["#3a0ca3", "#4361ee", "#2ec4b6", "#9ef01a", "#ffd60a", "#ff5400"] },
+  { name: "Lagoon", stops: ["#0d3b48", "#1b7f8c", "#8fd3c7", "#f3e9d2", "#f4a259", "#e4572e"] },
+];
+
+const MODES = {
+  sl: {
+    tab: "SmoothLife", key: "1",
+    blurb: "Conway's Game of Life with smooth values instead of on/off cells. Each pixel compares a small disk around it with a wider ring. Watch for gliders, blobs with holes, and amoebas that bud off new creatures.",
+    hint: "Drag to drop new life · Shift-drag to erase",
+    brush: ["Seed", "Erase"],
+    params: [
+      { id: "b1", label: "Birth low", min: 0.20, max: 0.34, step: 0.001, val: 0.278 },
+      { id: "b2", label: "Birth high", min: 0.30, max: 0.44, step: 0.001, val: 0.365 },
+      { id: "d1", label: "Survive low", min: 0.20, max: 0.36, step: 0.001, val: 0.267 },
+      { id: "d2", label: "Survive high", min: 0.38, max: 0.52, step: 0.001, val: 0.445 },
+      { id: "ra", label: "Creature size", min: 7, max: 16, step: 1, val: 10 },
+      { id: "speed", label: "Speed (steps/frame)", min: 0.05, max: 3, step: 0.05, val: 0.3 },
+      { id: "edge", label: "Edge level", min: 0.05, max: 0.8, step: 0.01, val: 0.42 },
+      { id: "soft", label: "Edge softness", min: 0.01, max: 0.4, step: 0.01, val: 0.14 },
+    ],
+    toggles: [{ id: "alive", label: "Keep alive (drop new seeds every few seconds)", val: true }],
+    presets: [
+      { name: "Gliders", v: { b1: 0.278, b2: 0.365, d1: 0.267, d2: 0.445 } },
+      { name: "Cells", v: { b1: 0.278, b2: 0.38, d1: 0.267, d2: 0.445 } },
+      { name: "Foam", v: { b1: 0.278, b2: 0.365, d1: 0.267, d2: 0.47 } },
+      { name: "Drifters", v: { b1: 0.278, b2: 0.35, d1: 0.267, d2: 0.445 } },
+    ],
+  },
+  gs: {
+    tab: "Reaction", key: "2",
+    blurb: "Reaction-diffusion (Gray-Scott). Two simulated chemicals spread and react. Feed and kill rates decide whether you get dividing spots, coral, worms or a maze.",
+    hint: "Drag to drop chemical · Shift-drag to erase",
+    brush: ["Seed", "Erase"],
+    params: [
+      { id: "f", label: "Feed rate", min: 0.010, max: 0.090, step: 0.0005, val: 0.0367 },
+      { id: "k", label: "Kill rate", min: 0.045, max: 0.070, step: 0.0001, val: 0.0649 },
+      { id: "iters", label: "Speed (steps/frame)", min: 1, max: 30, step: 1, val: 12 },
+      { id: "scale", label: "Pattern scale", min: 1, max: 4, step: 0.25, val: 2.25, rebuild: true },
+      { id: "edge", label: "Edge level", min: 0.05, max: 0.8, step: 0.01, val: 0.3 },
+      { id: "soft", label: "Edge softness", min: 0.01, max: 0.4, step: 0.01, val: 0.12 },
+    ],
+    toggles: [],
+    presets: [
+      { name: "Mitosis", v: { f: 0.0367, k: 0.0649 } },
+      { name: "Coral", v: { f: 0.0545, k: 0.062 } },
+      { name: "Worms", v: { f: 0.078, k: 0.061 } },
+      { name: "Maze", v: { f: 0.029, k: 0.057 } },
+    ],
+  },
+  pl: {
+    tab: "Particles", key: "3",
+    blurb: "Particle life. Each color of particle is pulled toward or pushed away from every other color by a random rule. They organize into cells, chains and things that chase each other. Drawn as metaballs, so clusters melt together.",
+    hint: "Drag to push particles · Shift-drag to pull them in",
+    brush: ["Push", "Pull"],
+    params: [
+      { id: "count", label: "Particles", min: 200, max: 1600, step: 50, val: 600, reinit: true },
+      { id: "types", label: "Colors", min: 2, max: 8, step: 1, val: 6, reinit: true },
+      { id: "rmax", label: "Reach", min: 0.04, max: 0.2, step: 0.005, val: 0.09 },
+      { id: "force", label: "Force", min: 1, max: 20, step: 0.5, val: 8 },
+      { id: "friction", label: "Glide", min: 0.01, max: 0.2, step: 0.005, val: 0.04 },
+      { id: "blob", label: "Blob size", min: 0.02, max: 0.14, step: 0.005, val: 0.045 },
+      { id: "density", label: "Merge amount", min: 0.3, max: 3, step: 0.05, val: 0.8 },
+      { id: "edge", label: "Edge level", min: 0.05, max: 0.8, step: 0.01, val: 0.4 },
+      { id: "soft", label: "Edge softness", min: 0.01, max: 0.4, step: 0.01, val: 0.12 },
+    ],
+    toggles: [],
+    presets: [
+      { name: "New rules", action: "rules" },
+      { name: "Symmetric", action: "sym" },
+      { name: "Chasers", action: "chase" },
+    ],
+  },
+};
+
+const LOOK = [
+  { id: "grain", label: "Grain", min: 0, max: 0.45, step: 0.01, val: 0.17 },
+  { id: "glow", label: "Glow", min: 0, max: 1.6, step: 0.05, val: 0.6 },
+  { id: "tilt", label: "Gradient tilt", min: -1, max: 1, step: 0.05, val: 0.3 },
+  { id: "rim", label: "Rim light", min: 0, max: 1.5, step: 0.05, val: 0.7 },
+  { id: "drift", label: "Color drift", min: 0, max: 0.4, step: 0.01, val: 0.08 },
+];
+
+/* ---------------- state ---------------- */
+const P = {};
+for (const m in MODES) {
+  P[m] = {};
+  for (const p of MODES[m].params) P[m][p.id] = p.val;
+  for (const t of MODES[m].toggles) P[m][t.id] = t.val;
+}
+const look = {}; for (const p of LOOK) look[p.id] = p.val;
+const S = { mode: "sl", paused: false, flip: false, pal: 0, preset: { sl: 0, gs: 0, pl: -1 } };
+const ptr = { down: false, x: 0.5, y: 0.5, shift: false, right: false };
+const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------------- WebGL setup ---------------- */
+const canvas = document.getElementById("c");
+const errEl = document.getElementById("err");
+function fail(msg) { errEl.hidden = false; errEl.textContent = msg; throw new Error(msg); }
+const gl = canvas.getContext("webgl2", { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false });
+if (!gl) fail("This sketch needs WebGL2, which this browser or device doesn't provide. Try a recent Chrome, Edge, Firefox or Safari on a laptop.");
+let SIMF = null;
+if (gl.getExtension("EXT_color_buffer_float")) SIMF = gl.RGBA32F;
+else if (gl.getExtension("EXT_color_buffer_half_float")) SIMF = gl.RGBA16F;
+if (!SIMF) fail("This device can't render to floating-point textures, which the simulations need. Try a laptop or desktop browser.");
+const VIEWF = gl.RGBA16F;
+
+const HDR = "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n";
+const VS_QUAD = `#version 300 es
+layout(location=0) in vec2 aPos;
+void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+const HASH = `
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }`;
+
+const FS_SL = HDR + HASH + `
+uniform sampler2D uState; uniform ivec2 uSize; uniform int uRa;
+uniform float uB1, uB2, uD1, uD2, uTime, uAspect;
+uniform vec4 uBrush; uniform vec4 uBox;
+out vec4 o;
+bool outside(ivec2 p){ vec2 uv = (vec2(p) + 0.5) / vec2(uSize); vec2 m = 2.0 / vec2(uSize); return uv.x < uBox.x + m.x || uv.x > uBox.z - m.x || uv.y < uBox.y + m.y || uv.y > uBox.w - m.y; }
+float s1(float x, float a, float al){ return 1.0 / (1.0 + exp(-(x - a) * 4.0 / al)); }
+void main(){
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  float ra = float(uRa); float ri = ra / 3.0;
+  float mS = 0.0, mW = 0.0, nS = 0.0, nW = 0.0;
+  for (int y = -uRa; y <= uRa; y++) {
+    for (int x = -uRa; x <= uRa; x++) {
+      float r = length(vec2(float(x), float(y)));
+      float wi = clamp(ri + 0.5 - r, 0.0, 1.0);
+      float wo = clamp(ra + 0.5 - r, 0.0, 1.0) - wi;
+      if (wi + wo <= 0.0) continue;
+      float v = texelFetch(uState, (p + ivec2(x, y) + uSize) % uSize, 0).r;
+      mS += wi * v; mW += wi; nS += wo * v; nW += wo;
+    }
+  }
+  float m = mS / mW, n = nS / nW;
+  float am = 0.147, an = 0.028;
+  float sm = s1(m, 0.5, am);
+  float lo = mix(uB1, uD1, sm), hi = mix(uB2, uD2, sm);
+  float a = s1(n, lo, an) * (1.0 - s1(n, hi, an));
+  if (uBrush.w != 0.0) {
+    vec2 uv = (vec2(p) + 0.5) / vec2(uSize);
+    vec2 d = uv - uBrush.xy; d -= floor(d + 0.5);
+    if (length(d * vec2(uAspect, 1.0)) < uBrush.z) a = uBrush.w > 0.0 ? 1.0 : 0.0;
+  }
+  if (outside(p)) a = 0.0;
+  o = vec4(a, 0.0, 0.0, 1.0);
+}`;
+
+const FS_GS = HDR + HASH + `
+uniform sampler2D uState; uniform ivec2 uSize;
+uniform float uF, uK, uTime, uAspect;
+uniform vec4 uBrush; uniform vec4 uBox;
+out vec4 o;
+bool outside(ivec2 p){ vec2 uv = (vec2(p) + 0.5) / vec2(uSize); vec2 m = 2.0 / vec2(uSize); return uv.x < uBox.x + m.x || uv.x > uBox.z - m.x || uv.y < uBox.y + m.y || uv.y > uBox.w - m.y; }
+vec2 S(ivec2 q){ return texelFetch(uState, (q + uSize) % uSize, 0).rg; }
+void main(){
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec2 c = S(p);
+  vec2 lap = -c
+    + 0.2 * (S(p + ivec2(1,0)) + S(p + ivec2(-1,0)) + S(p + ivec2(0,1)) + S(p + ivec2(0,-1)))
+    + 0.05 * (S(p + ivec2(1,1)) + S(p + ivec2(-1,1)) + S(p + ivec2(1,-1)) + S(p + ivec2(-1,-1)));
+  float a = c.x, b = c.y, r = a * b * b;
+  a += (1.0 * lap.x - r + uF * (1.0 - a));
+  b += (0.5 * lap.y + r - (uK + uF) * b);
+  if (uBrush.w != 0.0) {
+    vec2 uv = (vec2(p) + 0.5) / vec2(uSize);
+    vec2 d = uv - uBrush.xy; d -= floor(d + 0.5);
+    if (length(d * vec2(uAspect, 1.0)) < uBrush.z) {
+      if (uBrush.w > 0.0) { b = 0.9; a = 0.3; } else { b = 0.0; a = 1.0; }
+    }
+  }
+  if (outside(p)) { a = 1.0; b = 0.0; }
+  o = vec4(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0), 0.0, 1.0);
+}`;
+
+// Moves the whole simulation along a velocity field: beat shockwaves (push + spin) and a global jolt.
+const FS_ADV = HDR + `
+uniform sampler2D uState; uniform ivec2 uSize; uniform float uAspect;
+uniform vec4 uImp[6]; uniform float uSwirl[6]; uniform int uN; uniform vec2 uToss;
+uniform ivec2 uOut; uniform vec4 uBox; uniform float uWallFade;
+out vec4 o;
+vec2 vel(vec2 uv){
+  vec2 v = uToss;
+  for (int i = 0; i < 6; i++) {
+    if (i >= uN) break;
+    vec2 d = uv - uImp[i].xy; d.x *= uAspect;
+    float r = length(d) + 1e-4, age = uImp[i].w;
+    float R = age * 0.6, w = 0.07 + age * 0.06;
+    float prof = exp(-pow((r - R) / w, 2.0)) + 0.35 * exp(-r * r / 0.01) * step(age, 0.25);
+    float fade = pow(max(1.0 - age / 1.2, 0.0), 2.0);
+    vec2 dir = d / r, tang = vec2(-dir.y, dir.x);
+    float sw = uSwirl[i];
+    v += (dir * (1.0 - abs(sw)) + tang * sw) * prof * fade * uImp[i].z;
+  }
+  // during a song portrait, pushes fade out near the frame so nothing is shoved into the wall
+  float e = min(min(uv.x - uBox.x, uBox.z - uv.x) * uAspect, min(uv.y - uBox.y, uBox.w - uv.y));
+  v *= mix(1.0, smoothstep(0.0, 0.08, e), uWallFade);
+  v.x /= uAspect;
+  return v;
+}
+vec4 F(ivec2 q){ return texelFetch(uState, clamp(q, ivec2(0), uSize - 1), 0); }
+void main(){
+  vec2 uv = gl_FragCoord.xy / vec2(uOut);
+  vec2 src = (uv - vel(uv)) * vec2(uSize) - 0.5;
+  vec2 i = floor(src), t = src - i; ivec2 q = ivec2(i);
+  o = mix(mix(F(q), F(q + ivec2(1,0)), t.x), mix(F(q + ivec2(0,1)), F(q + ivec2(1,1)), t.x), t.y);
+}`;
+
+const VS_SPLAT = `#version 300 es
+layout(location=0) in vec3 aP;
+uniform float uPt;
+out float vT;
+void main(){ vT = aP.z; gl_Position = vec4(aP.xy * 2.0 - 1.0, 0.0, 1.0); gl_PointSize = uPt; }`;
+const FS_SPLAT = HDR + `
+in float vT; out vec4 o;
+void main(){
+  vec2 c = gl_PointCoord * 2.0 - 1.0; float d2 = dot(c, c);
+  if (d2 > 1.0) discard;
+  float w = 1.0 - d2; w = w * w * w;
+  o = vec4(w, w * vT, 0.0, 0.0);
+}`;
+
+// converts each system's raw state into a common (shape, hue) field
+const FS_VIEW = HDR + `
+uniform sampler2D uSrc; uniform sampler2D uPrev; uniform int uMode; uniform float uDensity, uPhase;
+out vec4 o;
+void main(){
+  vec4 s = texelFetch(uSrc, ivec2(gl_FragCoord.xy), 0);
+  float v, h = 0.0;
+  if (uMode == 0) v = mix(texelFetch(uPrev, ivec2(gl_FragCoord.xy), 0).r, s.r, uPhase); // glide between SmoothLife steps
+  else if (uMode == 1) v = clamp(s.g * 2.6, 0.0, 1.0);
+  else { v = 1.0 - exp(-s.r * uDensity); h = 0.18 + 0.82 * (s.g / max(s.r, 1e-4)); }
+  o = vec4(v, h, 0.0, 1.0);
+}`;
+
+const FS_DISPLAY = HDR + HASH + `
+uniform sampler2D uView; uniform vec2 uRes; uniform float uTime;
+uniform vec3 uPal[6]; uniform vec3 uBg;
+uniform float uGrain, uGlow, uEdge, uSoft, uTilt, uRim, uDrift, uHueMix, uGrainAnim, uDepth, uBoxOn;
+uniform vec4 uBox; uniform float uShift;
+out vec4 o;
+vec3 pal(float t){
+  t = clamp(t, 0.0, 1.0) * 5.0; int i = int(min(floor(t), 4.0)); float f = t - float(i);
+  f = f * f * (3.0 - 2.0 * f); return mix(uPal[i], uPal[i + 1], f);
+}
+vec4 cubic(float v){
+  vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v; vec4 s = n * n * n;
+  float x = s.x, y = s.y - 4.0 * s.x, z = s.z - 4.0 * s.y + 6.0 * s.x, w = 6.0 - x - y - z;
+  return vec4(x, y, z, w) * (1.0 / 6.0);
+}
+vec4 bic(vec2 uv){
+  vec2 sz = vec2(textureSize(uView, 0)); vec2 inv = 1.0 / sz;
+  uv = uv * sz - 0.5; vec2 f = fract(uv); uv -= f;
+  vec4 xc = cubic(f.x), yc = cubic(f.y);
+  vec4 c = uv.xxyy + vec2(-0.5, 1.5).xyxy;
+  vec4 s = vec4(xc.xz + xc.yw, yc.xz + yc.yw);
+  vec4 off = (c + vec4(xc.yw, yc.yw) / s) * inv.xxyy;
+  vec4 s0 = texture(uView, off.xz), s1 = texture(uView, off.yz), s2 = texture(uView, off.xw), s3 = texture(uView, off.yw);
+  float sx = s.x / (s.x + s.y), sy = s.z / (s.z + s.w);
+  return mix(mix(s3, s2, sx), mix(s1, s0, sx), sy);
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec4 s = bic(uv); float v = s.r, h = s.g;
+  vec2 tx = 1.0 / vec2(textureSize(uView, 0));
+  float vx = bic(uv + vec2(tx.x, 0.0)).r - bic(uv - vec2(tx.x, 0.0)).r;
+  float vy = bic(uv + vec2(0.0, tx.y)).r - bic(uv - vec2(0.0, tx.y)).r;
+
+  vec2 asp = vec2(uRes.y / uRes.x, 1.0);
+  float halo = 0.0, inner = 0.0;
+  for (int i = 0; i < 8; i++) {
+    float a = float(i) * 0.785398 + 0.39;
+    vec2 d = vec2(cos(a), sin(a)) * asp;
+    float r1 = texture(uView, uv + d * 0.022).r;
+    inner += texture(uView, uv + d * 0.011).r + r1;
+    halo += r1 + 0.6 * texture(uView, uv + d * 0.055).r;
+  }
+  halo /= 12.8; inner /= 16.0;
+  // depth: how far inside a blob this pixel sits, so blob centers run hotter than their edges
+  float depth = clamp((inner * 0.7 + v * 0.3 - uEdge) / (1.0 - uEdge + 1e-3), 0.0, 1.0);
+  float base = mix(v, 0.12 + 0.88 * depth, uDepth);
+
+  float t = mix(base, h, uHueMix) + uShift + (uv.y - 0.5) * uTilt + sin(uTime * 0.13 + uv.x * 2.3 + uv.y * 1.1) * uDrift;
+  vec3 col = pal(t);
+  float aa = max(uSoft, fwidth(v) * 1.5);
+  float body = smoothstep(uEdge - aa, uEdge + aa, v);
+
+  vec3 n = normalize(vec3(-vx * 7.0, -vy * 7.0, 1.0));
+  vec3 L = normalize(vec3(-0.55, 0.65, 0.55));
+  float band = exp(-pow((v - uEdge) / (uSoft + 0.06), 2.0));
+  float hi = max(dot(n, L) - 0.62, 0.0) * 2.6 * band * uRim;
+  float sh = max(-dot(n.xy, normalize(L.xy)), 0.0) * band * uRim * 0.45;
+
+  vec3 c = uBg;
+  vec3 dim = vec3(1.0 - (uv.y - 0.5) * 0.15);
+  c += pal(t * 0.55 + 0.1) * halo * uGlow * 0.75;
+  vec3 fill = col * (0.78 + 0.32 * v) * (1.0 - sh);
+  c = mix(c, fill, body);
+  c += hi * vec3(1.0, 0.95, 0.86) * body;
+  c *= dim;
+  if (uBoxOn > 0.5) {
+    // thin rounded frame around the particle container
+    vec2 px = gl_FragCoord.xy;
+    vec2 lo = uBox.xy * uRes, hi2 = uBox.zw * uRes;
+    vec2 ctr = (lo + hi2) * 0.5, hsz = (hi2 - lo) * 0.5;
+    float rad = 10.0 * uRes.y / 900.0;
+    vec2 q2 = abs(px - ctr) - hsz + rad;
+    float sd = length(max(q2, 0.0)) + min(max(q2.x, q2.y), 0.0) - rad;
+    float lw = max(1.0, uRes.y / 700.0);
+    float line = 1.0 - smoothstep(lw * 0.5, lw * 0.5 + 1.0, abs(sd));
+    c *= 1.0 - 0.18 * smoothstep(0.0, 2.0, sd);
+    c = mix(c, vec3(0.95, 0.9, 0.84), line * 0.38);
+  }
+
+  float g = hash(gl_FragCoord.xy + fract(uTime * 7.13 * uGrainAnim) * vec2(97.1, 61.7)) - 0.5;
+  float g2 = hash(gl_FragCoord.xy * 0.5 + 17.0 + floor(uTime * 12.0 * uGrainAnim)) - 0.5;
+  c += (g * 0.75 + g2 * 0.35) * uGrain * (0.55 + 0.45 * body);
+  c *= 1.0 + g * uGrain * 0.5;
+
+  vec2 q = (uv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
+  c *= 1.0 - 0.32 * dot(q, q);
+  o = vec4(max(c, 0.0), 1.0);
+}`;
+
+function compile(type, src) {
+  const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(sh), src); fail("A shader failed to compile on this device: " + gl.getShaderInfoLog(sh)); }
+  return sh;
+}
+function program(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) fail("Shader link failed: " + gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); const name = info.name.replace(/\[0\]$/, ""); u[name] = gl.getUniformLocation(p, info.name); }
+  return { p, u };
+}
+const progSL = program(VS_QUAD, FS_SL);
+const progGS = program(VS_QUAD, FS_GS);
+const progSplat = program(VS_SPLAT, FS_SPLAT);
+const progAdv = program(VS_QUAD, FS_ADV);
+// Song image, step 1: store each kept moment's shape field (not its colours) in a texture-array layer.
+const FS_CAP = HDR + `
+uniform sampler2D uView; uniform vec4 uBox; uniform float uIsPL; uniform vec2 uOut;
+out vec4 o;
+vec4 cubicW(float v){ vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v; vec4 s = n * n * n;
+  float x = s.x, y = s.y - 4.0 * s.x, z = s.z - 4.0 * s.y + 6.0 * s.x, w = 6.0 - x - y - z; return vec4(x, y, z, w) * (1.0 / 6.0); }
+vec4 bic(vec2 uv){ vec2 sz = vec2(textureSize(uView, 0)), inv = 1.0 / sz; uv = uv * sz - 0.5; vec2 f = fract(uv); uv -= f;
+  vec4 xc = cubicW(f.x), yc = cubicW(f.y), c = uv.xxyy + vec2(-0.5, 1.5).xyxy, s = vec4(xc.xz + xc.yw, yc.xz + yc.yw);
+  vec4 off = (c + vec4(xc.yw, yc.yw) / s) * inv.xxyy;
+  vec4 s0 = texture(uView, off.xz), s1 = texture(uView, off.yz), s2 = texture(uView, off.xw), s3 = texture(uView, off.yw);
+  float sx = s.x / (s.x + s.y), sy = s.z / (s.z + s.w); return mix(mix(s3, s2, sx), mix(s1, s0, sx), sy); }
+void main(){
+  vec2 uv = mix(uBox.xy, uBox.zw, gl_FragCoord.xy / uOut);
+  vec4 f = bic(uv);
+  o = vec4(f.r, f.g, uIsPL, 1.0);
+}`;
+// step 2: merge all moments into one smooth field. Time runs left to right along wandering borders;
+// each moment's shapes are blurred and blended with its neighbours, so small specks melt away
+// and what remains are large, soft forms. A = position in time (used to blend the palettes).
+const FS_MERGE = HDR + `
+uniform highp sampler2DArray uL; uniform vec2 uOut, uLayer; uniform int uK; uniform float uAmp, uFeather, uSeed, uBlur; uniform float uOn[24], uGain[24], uBlurK[24], uMap[24];
+out vec4 o;
+float h2(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 19.19); return fract(p.x * p.y); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h2(i), h2(i + vec2(1,0)), f.x), mix(h2(i + vec2(0,1)), h2(i + vec2(1,1)), f.x), f.y); }
+float fbm(vec2 p){ return 0.55 * vn(p) + 0.3 * vn(p * 2.1 + 3.7) + 0.15 * vn(p * 4.3 + 9.1); }
+vec3 blurred(vec2 uv, float k0){
+  float k = uMap[int(k0)]; // empty moments borrow the nearest moment that has content
+  float bl = uBlur * uBlurK[int(k)];
+  vec2 r = vec2(bl * uOut.y / uOut.x, bl);
+  float lod = max(0.0, log2(bl * uLayer.y * 0.6));
+  vec3 acc = textureLod(uL, vec3(uv, k), lod).rgb * 2.0;
+  for (int i = 0; i < 8; i++) { float a = float(i) * 0.785398; acc += textureLod(uL, vec3(uv + vec2(cos(a), sin(a)) * r * 0.7, k), lod).rgb; }
+  acc /= 10.0;
+  acc.r = min(1.0, acc.r * uGain[int(k)]); // sparse moments are strengthened so they fill the canvas
+  return acc;
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy / uOut;
+  float K = float(uK);
+  float wv = (fbm(vec2(uv.x * 1.6, uv.y * 2.2) + uSeed) - 0.5) * 2.0;
+  float m = clamp(uv.x * K - 0.5 + wv * uAmp, 0.0, K - 1.0);
+  float base = floor(m), reach = 0.6 + uFeather * 4.0;
+  vec3 sum = vec3(0.0); float ws = 0.0, ts = 0.0, mx = 0.0;
+  for (int j = -3; j <= 3; j++) {
+    float k = base + float(j);
+    if (k < 0.0 || k > K - 1.0) continue;
+    float d = abs(m - k) / reach, w = exp(-d * d * 2.5) * uOn[int(k)]; // gaussian: no visible seams; empty moments are skipped
+    if (w < 0.01) continue;
+    vec3 f = blurred(uv, k);
+    sum += f * w; ws += w; ts += k * w; mx = max(mx, f.r * w);
+  }
+  vec3 f = sum / max(ws, 1e-4);
+  float F = mix(f.r, mx, 0.6);     // between an average and the strongest shape: merged but not washed out
+  o = vec4(F, f.g, f.b, ts / max(ws, 1e-4));
+}`;
+// step 3: paint the merged field with the same look as the live view: palette, glow, rim light, grain
+const FS_FINAL = HDR + `
+uniform sampler2D uF; uniform vec2 uOut; uniform int uK; uniform vec3 uPals[144]; uniform vec3 uBg;
+uniform float uGrain, uGlow, uEdge, uSoft, uTilt, uRim;
+out vec4 o;
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+vec3 palK(int k, float t){ t = clamp(t, 0.0, 1.0) * 5.0; int i = int(min(floor(t), 4.0)); float f = t - float(i); f = f * f * (3.0 - 2.0 * f);
+  return mix(uPals[k * 6 + i], uPals[k * 6 + i + 1], f); }
+vec3 pal(float t, float T){ float k0 = floor(T); int a = int(k0), b = int(min(k0 + 1.0, float(uK - 1))); return mix(palK(a, t), palK(b, t), T - k0); }
+vec4 cubicW(float v){ vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v; vec4 s = n * n * n;
+  float x = s.x, y = s.y - 4.0 * s.x, z = s.z - 4.0 * s.y + 6.0 * s.x, w = 6.0 - x - y - z; return vec4(x, y, z, w) * (1.0 / 6.0); }
+vec4 bic(vec2 uv){ vec2 sz = vec2(textureSize(uF, 0)), inv = 1.0 / sz; uv = uv * sz - 0.5; vec2 f = fract(uv); uv -= f;
+  vec4 xc = cubicW(f.x), yc = cubicW(f.y), c = uv.xxyy + vec2(-0.5, 1.5).xyxy, s = vec4(xc.xz + xc.yw, yc.xz + yc.yw);
+  vec4 off = (c + vec4(xc.yw, yc.yw) / s) * inv.xxyy;
+  vec4 s0 = texture(uF, off.xz), s1 = texture(uF, off.yz), s2 = texture(uF, off.xw), s3 = texture(uF, off.yw);
+  float sx = s.x / (s.x + s.y), sy = s.z / (s.z + s.w); return mix(mix(s3, s2, sx), mix(s1, s0, sx), sy); }
+void main(){
+  vec2 uv = gl_FragCoord.xy / uOut;
+  vec4 s = bic(uv); float v = s.r, h = s.g, isPL = s.b, T = s.a;
+  vec2 tx = 1.0 / vec2(textureSize(uF, 0));
+  float vx = bic(uv + vec2(tx.x, 0.0)).r - bic(uv - vec2(tx.x, 0.0)).r;
+  float vy = bic(uv + vec2(0.0, tx.y)).r - bic(uv - vec2(0.0, tx.y)).r;
+  float halo = textureLod(uF, uv, 3.0).r * 0.6 + textureLod(uF, uv, 4.5).r * 0.4;
+  float inner = textureLod(uF, uv, 2.0).r;
+  float depth = clamp((inner * 0.6 + v * 0.4 - uEdge) / (1.0 - uEdge + 1e-3), 0.0, 1.0);
+  float base = 0.12 + 0.88 * depth;
+  float t = mix(base, h, 0.8 * isPL) + (uv.y - 0.5) * uTilt;
+  vec3 col = pal(t, T);
+  float aa = max(uSoft, fwidth(v) * 1.5);
+  float body = smoothstep(uEdge - aa, uEdge + aa, v);
+  vec3 n = normalize(vec3(-vx * 9.0, -vy * 9.0, 1.0)), L = normalize(vec3(-0.55, 0.65, 0.55));
+  float band = exp(-pow((v - uEdge) / (uSoft + 0.06), 2.0));
+  float hi = max(dot(n, L) - 0.62, 0.0) * 2.6 * band * uRim;
+  float sh = max(-dot(n.xy, normalize(L.xy)), 0.0) * band * uRim * 0.45;
+  vec3 c = uBg + pal(t * 0.55 + 0.1, T) * halo * uGlow * 0.75;
+  c = mix(c, col * (0.8 + 0.3 * v) * (1.0 - sh), body);
+  c += hi * vec3(1.0, 0.95, 0.86) * body;
+  c *= 1.0 - (uv.y - 0.5) * 0.12;
+  float g = hash(gl_FragCoord.xy) - 0.5, g2 = hash(gl_FragCoord.xy * 0.5 + 17.0) - 0.5;
+  c += (g * 0.75 + g2 * 0.35) * uGrain * (0.55 + 0.45 * body);
+  vec2 q = (uv - 0.5) * vec2(uOut.x / uOut.y, 1.0); c *= 1.0 - 0.28 * dot(q, q);
+  o = vec4(max(c, 0.0), 1.0);
+}`;
+
+const progCap = program(VS_QUAD, FS_CAP);
+const progMerge = program(VS_QUAD, FS_MERGE);
+const progFinal = program(VS_QUAD, FS_FINAL);
+// Live transitions: the old system's last shapes dissolve region by region along an organic front
+// while the new system (grown from those same shapes) takes over.
+const FS_COPY = HDR + `uniform sampler2D uSrc; uniform vec2 uOut; out vec4 o; void main(){ o = texture(uSrc, gl_FragCoord.xy / uOut); }`;
+const FS_DISSOLVE = HDR + `
+float h2(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 19.19); return fract(p.x * p.y); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h2(i), h2(i + vec2(1,0)), f.x), mix(h2(i + vec2(0,1)), h2(i + vec2(1,1)), f.x), f.y); }
+float fbm(vec2 p){ return 0.55 * vn(p) + 0.3 * vn(p * 2.1 + 3.7) + 0.15 * vn(p * 4.3 + 9.1); }
+uniform sampler2D uNew, uOld; uniform vec2 uOut; uniform float uP, uSeed;
+out vec4 o;
+void main(){
+  vec2 uv = gl_FragCoord.xy / uOut;
+  vec4 n = texture(uNew, uv), od = texture(uOld, uv);
+  float d = fbm(uv * vec2(3.2, 2.4) + uSeed);
+  float front = mix(0.12, 0.95, uP);
+  float keep = smoothstep(front - 0.07, front + 0.07, d); // 1 where the front hasn't arrived yet
+  float vo = od.r * keep;
+  o = vo > n.r ? vec4(vo, od.g, od.b, 1.0) : n;
+}`;
+// Song image: each section of the song gets its own region, painted crisp from that section's best moment
+// with the same look as the live view. Regions run left to right in song order and meet along wavy borders.
+const FS_REGIONS = HDR + `
+float h2(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 19.19); return fract(p.x * p.y); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h2(i), h2(i + vec2(1,0)), f.x), mix(h2(i + vec2(0,1)), h2(i + vec2(1,1)), f.x), f.y); }
+float fbm(vec2 p){ return 0.55 * vn(p) + 0.3 * vn(p * 2.1 + 3.7) + 0.15 * vn(p * 4.3 + 9.1); }
+uniform highp sampler2DArray uL; uniform vec2 uOut; uniform int uN; uniform vec4 uReg[24];
+uniform vec3 uPals[144]; uniform vec3 uBg; uniform float uGrain, uGlow, uTilt, uRim, uAmp, uSeed;
+out vec4 o;
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+vec4 cubicW(float v){ vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v; vec4 s = n * n * n;
+  float x = s.x, y = s.y - 4.0 * s.x, z = s.z - 4.0 * s.y + 6.0 * s.x, w = 6.0 - x - y - z; return vec4(x, y, z, w) * (1.0 / 6.0); }
+vec4 bicA(vec2 uv, float k){ vec2 sz = vec2(textureSize(uL, 0).xy), inv = 1.0 / sz; uv = uv * sz - 0.5; vec2 f = fract(uv); uv -= f;
+  vec4 xc = cubicW(f.x), yc = cubicW(f.y), c = uv.xxyy + vec2(-0.5, 1.5).xyxy, s = vec4(xc.xz + xc.yw, yc.xz + yc.yw);
+  vec4 off = (c + vec4(xc.yw, yc.yw) / s) * inv.xxyy;
+  vec4 s0 = texture(uL, vec3(off.xz, k)), s1 = texture(uL, vec3(off.yz, k)), s2 = texture(uL, vec3(off.xw, k)), s3 = texture(uL, vec3(off.yw, k));
+  float sx = s.x / (s.x + s.y), sy = s.z / (s.z + s.w); return mix(mix(s3, s2, sx), mix(s1, s0, sx), sy); }
+vec3 palR(int r, float t){ t = clamp(t, 0.0, 1.0) * 5.0; int i = int(min(floor(t), 4.0)); float f = t - float(i); f = f * f * (3.0 - 2.0 * f);
+  return mix(uPals[r * 6 + i], uPals[r * 6 + i + 1], f); }
+vec3 shade(vec2 uv, int r){
+  vec4 R = uReg[r]; float k = R.y, edge = R.z, soft = R.w;
+  vec4 s = bicA(uv, k); float v = s.r, h = s.g, isPL = s.b;
+  vec2 tx = 1.0 / vec2(textureSize(uL, 0).xy);
+  float vx = bicA(uv + vec2(tx.x, 0.0), k).r - bicA(uv - vec2(tx.x, 0.0), k).r;
+  float vy = bicA(uv + vec2(0.0, tx.y), k).r - bicA(uv - vec2(0.0, tx.y), k).r;
+  float halo = textureLod(uL, vec3(uv, k), 3.0).r * 0.6 + textureLod(uL, vec3(uv, k), 4.5).r * 0.4;
+  float inner = textureLod(uL, vec3(uv, k), 1.5).r;
+  float depth = clamp((inner * 0.7 + v * 0.3 - edge) / (1.0 - edge + 1e-3), 0.0, 1.0);
+  float base = mix(v, 0.12 + 0.88 * depth, isPL > 0.5 ? 0.0 : 0.8);
+  float t = mix(base, h, 0.8 * isPL) + (uv.y - 0.5) * uTilt;
+  vec3 col = palR(r, t);
+  float aa = max(soft, fwidth(v) * 1.5);
+  float body = smoothstep(edge - aa, edge + aa, v);
+  vec3 n = normalize(vec3(-vx * 7.0, -vy * 7.0, 1.0)), L = normalize(vec3(-0.55, 0.65, 0.55));
+  float band = exp(-pow((v - edge) / (soft + 0.06), 2.0));
+  float hi = max(dot(n, L) - 0.62, 0.0) * 2.6 * band * uRim;
+  float sh = max(-dot(n.xy, normalize(L.xy)), 0.0) * band * uRim * 0.45;
+  vec3 c = uBg + palR(r, t * 0.55 + 0.1) * halo * uGlow * 0.75;
+  c = mix(c, col * (0.78 + 0.32 * v) * (1.0 - sh), body);
+  return c + hi * vec3(1.0, 0.95, 0.86) * body;
+}
+int regionAt(float x){ int r = 0; for (int i = 1; i < 24; i++) { if (i >= uN) break; if (x >= uReg[i].x) r = i; } return r; }
+void main(){
+  vec2 uv = gl_FragCoord.xy / uOut;
+  float wv = (fbm(vec2(uv.x * 1.4, uv.y * 2.4) + uSeed) - 0.5) * 2.0 + 0.35 * (fbm(vec2(uv.x * 4.0, uv.y * 6.0) + uSeed * 1.3) - 0.5);
+  float x = uv.x + wv * uAmp * 0.05;
+  int r = regionAt(x);
+  vec3 c = shade(uv, r);
+  float px = 2.0 / uOut.x;
+  if (r > 0) { float d = x - uReg[r].x; if (d < px) c = mix(shade(uv, r - 1), c, smoothstep(-px, px, d)); }
+  if (r < uN - 1) { float d = uReg[r + 1].x - x; if (d < px) c = mix(shade(uv, r + 1), c, smoothstep(-px, px, d)); }
+  c *= 1.0 - (uv.y - 0.5) * 0.12;
+  float g = hash(gl_FragCoord.xy) - 0.5, g2 = hash(gl_FragCoord.xy * 0.5 + 17.0) - 0.5;
+  c += (g * 0.75 + g2 * 0.35) * uGrain;
+  vec2 q = (uv - 0.5) * vec2(uOut.x / uOut.y, 1.0); c *= 1.0 - 0.28 * dot(q, q);
+  o = vec4(max(c, 0.0), 1.0);
+}`;
+const progCopy = program(VS_QUAD, FS_COPY);
+const progDissolve = program(VS_QUAD, FS_DISSOLVE);
+const progRegions = program(VS_QUAD, FS_REGIONS);
+const progView = program(VS_QUAD, FS_VIEW);
+const progDisp = program(VS_QUAD, FS_DISPLAY);
+
+const quadVao = gl.createVertexArray(); gl.bindVertexArray(quadVao);
+const qb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, qb);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+const ptVao = gl.createVertexArray(); gl.bindVertexArray(ptVao);
+const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+gl.bindVertexArray(null);
+const MAX_PT = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1] || 64;
+
+function makeTarget(w, h, fmt, linear) {
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, fmt, w, h, 0, gl.RGBA, gl.FLOAT, null);
+  const f = linear ? gl.LINEAR : gl.NEAREST;
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) fail("This device can't render to the textures the simulations need.");
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex: t, fbo: fb, w, h };
+}
+function freeTarget(t) { if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); } }
+function upload(t, data, x = 0, y = 0, w = t.w, h = t.h) {
+  gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.texSubImage2D(gl.TEXTURE_2D, 0, x, y, w, h, gl.RGBA, gl.FLOAT, data);
+}
+function bindTex(unit, t) { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t.tex); }
+function drawQuad(target) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.fbo : null);
+  gl.viewport(0, 0, target ? target.w : canvas.width, target ? target.h : canvas.height);
+  gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+/* ---------------- resources per mode ---------------- */
+let ping = null, view = null, field = null, aspect = 1;
+const MODE_IDX = { sl: 0, gs: 1, pl: 2 };
+
+function freeAll() { if (ping) { freeTarget(ping[0]); freeTarget(ping[1]); } freeTarget(view); freeTarget(field); ping = view = field = null; }
+
+function setupMode() {
+  freeAll();
+  updateBox();
+  aspect = canvas.width / canvas.height;
+  const m = S.mode;
+  if (m === "sl" || m === "gs") {
+    if (m === "gs") S.gsScale = P.gs.scale;
+    const h = m === "sl" ? 200 : Math.round(560 / S.gsScale);
+    const w = Math.max(16, Math.round(h * aspect));
+    ping = [makeTarget(w, h, SIMF, false), makeTarget(w, h, SIMF, false)];
+    view = makeTarget(w, h, VIEWF, true);
+  } else {
+    const h = Math.max(96, Math.round(canvas.height / 2));
+    const w = Math.max(96, Math.round(h * aspect));
+    field = makeTarget(w, h, VIEWF, false);
+    view = makeTarget(w, h, VIEWF, true);
+  }
+  seed();
+}
+
+function rand(a, b) { return a + Math.random() * (b - a); }
+
+function slDrop(count) {
+  // squares of full value: the most reliable SmoothLife seed
+  const t = ping[0], s = P.sl.ra;
+  const block = new Float32Array(s * s * 4); for (let i = 0; i < s * s; i++) { block[i * 4] = 1; block[i * 4 + 3] = 1; }
+  for (let i = 0; i < count; i++) {
+    const x0 = Math.ceil(BOX.x0 * t.w) + 3, x1 = Math.floor(BOX.x1 * t.w) - s - 3, y0 = Math.ceil(BOX.y0 * t.h) + 3, y1 = Math.floor(BOX.y1 * t.h) - s - 3;
+    if (x1 <= x0 || y1 <= y0) return;
+    upload(t, block, Math.floor(rand(x0, x1)), Math.floor(rand(y0, y1)), s, s);
+  }
+}
+
+function seed() {
+  const m = S.mode;
+  if (m === "sl") {
+    const t = ping[0];
+    upload(t, new Float32Array(t.w * t.h * 4));
+    slDrop(Math.round(t.w * t.h * (BOX.x1 - BOX.x0) * (BOX.y1 - BOX.y0) / 420));
+  } else if (m === "gs") {
+    const t = ping[0], d = new Float32Array(t.w * t.h * 4);
+    for (let i = 0; i < t.w * t.h; i++) { d[i * 4] = 1; d[i * 4 + 3] = 1; }
+    const n = Math.round(t.w * t.h / 2600) + 6;
+    for (let k = 0; k < n; k++) {
+      const r = rand(2.5, 7), cx = rand(BOX.x0 * t.w + r + 3, BOX.x1 * t.w - r - 3), cy = rand(BOX.y0 * t.h + r + 3, BOX.y1 * t.h - r - 3);
+      for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+        if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+        const xx = (x + t.w) % t.w, yy = (y + t.h) % t.h, i = (yy * t.w + xx) * 4;
+        d[i] = 0.5; d[i + 1] = 0.25 + Math.random() * 0.1;
+      }
+    }
+    upload(t, d);
+  } else {
+    plInit(true);
+  }
+}
+
+/* ---------------- particle life (CPU) ---------------- */
+const PL = { n: 0, m: 0, X: null, Y: null, VX: null, VY: null, T: null, M: null, buf: null };
+function plRules(kind) {
+  const m = PL.m; PL.M = new Float32Array(m * m);
+  for (let i = 0; i < m; i++) for (let j = 0; j < m; j++) {
+    let v = rand(-1, 1);
+    if (kind === "chase") v = j === (i + 1) % m ? rand(0.6, 1) : (j === (i + m - 1) % m ? rand(-1, -0.5) : rand(-0.3, 0.3));
+    if (i === j && kind !== "chase") v = rand(0.2, 1);
+    PL.M[i * m + j] = v;
+  }
+  if (kind === "sym") for (let i = 0; i < m; i++) for (let j = 0; j < i; j++) PL.M[i * m + j] = PL.M[j * m + i];
+}
+/* container box: the open area of the screen not covered by the controls, with a margin */
+const BOX = { x0: 0, y0: 0, x1: 1, y1: 1 }; // uv units, y up
+function updateBox() {
+  if (PR.running) return;
+  const vw = canvas.clientWidth, vh = canvas.clientHeight, m = Math.max(24, Math.min(56, Math.min(vw, vh) * 0.06));
+  let L = m, R = vw - m, T = m, B = vh - m;
+  const pan = document.getElementById("panel");
+  if (!pan.hidden) {
+    const r = pan.getBoundingClientRect();
+    if (r.top > vh * 0.3) B = Math.min(B, r.top - m * 0.6);   // bottom sheet on phones
+    else R = Math.min(R, r.left - m * 0.6);                  // side rail on desktop
+  }
+  if (R - L < 120) { L = m; R = vw - m; }
+  if (B - T < 120) { T = m; B = vh - m; }
+  BOX.x0 = L / vw; BOX.x1 = R / vw; BOX.y0 = 1 - B / vh; BOX.y1 = 1 - T / vh;
+}
+function plInit(keepRules) {
+  const n = P.pl.count | 0, m = P.pl.types | 0;
+  const rulesOk = keepRules && PL.M && PL.m === m;
+  PL.n = n; PL.m = m;
+  PL.X = new Float32Array(n); PL.Y = new Float32Array(n); PL.VX = new Float32Array(n); PL.VY = new Float32Array(n);
+  PL.T = new Uint8Array(n); PL.buf = new Float32Array(n * 3);
+  updateBox();
+  for (let i = 0; i < n; i++) { PL.X[i] = rand(BOX.x0, BOX.x1) * aspect; PL.Y[i] = rand(BOX.y0, BOX.y1); PL.T[i] = i % m; }
+  if (!rulesOk) plRules("rules");
+}
+function plForce(r, a) { const b = 0.3; if (r < b) return r / b - 1; if (r < 1) return a * (1 - Math.abs(2 * r - 1 - b) / (1 - b)); return 0; }
+function plStep() {
+  const { n, m, X, Y, VX, VY, T, M } = PL; const W = aspect, hw = W / 2;
+  const rMax = plRmax(), r2 = rMax * rMax, dt = 0.02, fr = Math.pow(0.5, dt / P.pl.friction), ff = rMax * P.pl.force * (1 + aR() * AU.bass * 1.3);
+  const brushOn = ptr.down, bx = ptr.x * W, by = ptr.y, bR = 0.14;
+  const sign = (S.flip !== (ptr.shift || ptr.right)) ? -1 : 1;
+  const inset = P.pl.blob * 0.55;
+  const wx0 = BOX.x0 * W + inset, wx1 = Math.max(wx0 + 0.01, BOX.x1 * W - inset);
+  const wy0 = BOX.y0 + inset, wy1 = Math.max(wy0 + 0.01, BOX.y1 - inset);
+  for (let i = 0; i < n; i++) {
+    const xi = X[i], yi = Y[i], row = T[i] * m; let fx = 0, fy = 0;
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const dx = X[j] - xi, dy = Y[j] - yi;
+      const d2 = dx * dx + dy * dy; if (d2 >= r2 || d2 === 0) continue;
+      const r = Math.sqrt(d2), f = plForce(r / rMax, M[row + T[j]]) / r;
+      fx += dx * f; fy += dy * f;
+    }
+    fx *= ff; fy *= ff;
+    if (brushOn) {
+      const dx = xi - bx, dy = yi - by;
+      const r = Math.hypot(dx, dy);
+      if (r < bR && r > 1e-5) { const k = (1 - r / bR) * 40 * sign / r; fx += dx * k; fy += dy * k; }
+    }
+    VX[i] = VX[i] * fr + fx * dt; VY[i] = VY[i] * fr + fy * dt;
+  }
+  if (motionActive()) { // beat shockwaves and jolts carry the particles, with a bit of momentum
+    for (let i = 0; i < n; i++) {
+      const v = fieldVel(X[i] / W, Y[i]);
+      if (PR.running) { const ux = X[i] / W, e = Math.min((ux - BOX.x0) * W, (BOX.x1 - ux) * W, Y[i] - BOX.y0, BOX.y1 - Y[i]), t = Math.min(Math.max(e / 0.08, 0), 1), f = t * t * (3 - 2 * t); v[0] *= f; v[1] *= f; }
+      X[i] += v[0]; Y[i] += v[1]; VX[i] += v[0] * 12; VY[i] += v[1] * 12;
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    let x = X[i] + VX[i] * dt, y = Y[i] + VY[i] * dt;
+    // bounce off the container walls, inset so the blobs stay inside the drawn frame
+    if (x < wx0) { x = wx0 + (wx0 - x); VX[i] = Math.abs(VX[i]) * 0.6; } else if (x > wx1) { x = wx1 - (x - wx1); VX[i] = -Math.abs(VX[i]) * 0.6; }
+    if (y < wy0) { y = wy0 + (wy0 - y); VY[i] = Math.abs(VY[i]) * 0.6; } else if (y > wy1) { y = wy1 - (y - wy1); VY[i] = -Math.abs(VY[i]) * 0.6; }
+    X[i] = Math.min(Math.max(x, wx0), wx1); Y[i] = Math.min(Math.max(y, wy0), wy1);
+  }
+}
+function plRender() {
+  const { n, m, X, Y, T, buf } = PL;
+  for (let i = 0; i < n; i++) { buf[i * 3] = X[i] / aspect; buf[i * 3 + 1] = Y[i]; buf[i * 3 + 2] = m > 1 ? T[i] / (m - 1) : 0.5; }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, field.fbo); gl.viewport(0, 0, field.w, field.h);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+  gl.useProgram(progSplat.p);
+  gl.uniform1f(progSplat.u.uPt, Math.min(MAX_PT, plBlob() * field.h * 2));
+  gl.bindVertexArray(ptVao); gl.bindBuffer(gl.ARRAY_BUFFER, pb);
+  gl.bufferData(gl.ARRAY_BUFFER, buf, gl.DYNAMIC_DRAW);
+  gl.drawArrays(gl.POINTS, 0, n);
+  gl.disable(gl.BLEND);
+}
+
+/* ---------------- simulation steps ---------------- */
+function brushVec(radius) {
+  if (!ptr.down) return [0, 0, 0, 0];
+  const erase = S.flip !== (ptr.shift || ptr.right);
+  return [ptr.x, ptr.y, radius, erase ? -1 : 1];
+}
+let slAcc = 0;
+function stepSL(time) {
+  advect();
+  slAcc += P.sl.speed * (1 + aR() * AU.level * 1.6);
+  const b = brushVec(P.sl.ra * 0.7 / ping[0].h);
+  while (slAcc >= 1) {
+    slAcc -= 1;
+    gl.useProgram(progSL.p); const u = progSL.u;
+    bindTex(0, ping[0]); gl.uniform1i(u.uState, 0);
+    gl.uniform2i(u.uSize, ping[0].w, ping[0].h); gl.uniform1i(u.uRa, slRa());
+    gl.uniform1f(u.uB1, P.sl.b1); gl.uniform1f(u.uB2, P.sl.b2); gl.uniform1f(u.uD1, P.sl.d1); gl.uniform1f(u.uD2, slD2());
+    gl.uniform1f(u.uAspect, aspect); gl.uniform4fv(u.uBrush, b); gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1);
+    drawQuad(ping[1]); ping.reverse();
+  }
+}
+function stepGS() {
+  advect();
+  let b = brushVec(0.025);
+  if (AU.beatNow && !ptr.down) b = [rand(BOX.x0 + 0.04, BOX.x1 - 0.04), rand(BOX.y0 + 0.06, BOX.y1 - 0.06), 0.012 + 0.008 * music.react, 1];
+  const iters = Math.max(1, Math.round((P.gs.iters | 0) * (1 + aR() * (AU.level * 1.4 - 0.25))));
+  gl.useProgram(progGS.p); const u = progGS.u;
+  gl.uniform2i(u.uSize, ping[0].w, ping[0].h);
+  const fk = gsFK(); gl.uniform1f(u.uF, fk[0]); gl.uniform1f(u.uK, fk[1]); gl.uniform1f(u.uAspect, aspect); gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1);
+  for (let i = 0; i < iters; i++) {
+    bindTex(0, ping[0]); gl.uniform1i(u.uState, 0);
+    gl.uniform4fv(u.uBrush, i === 0 ? b : [0, 0, 0, 0]);
+    drawQuad(ping[1]); ping.reverse();
+  }
+}
+
+/* ---------------- render ---------------- */
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+let palFlat = new Float32Array(18);
+function applyPalette() {
+  const st = PALETTES[S.pal].stops; st.forEach((h, i) => palFlat.set(hexToRgb(h), i * 3));
+  document.documentElement.style.setProperty("--accent", st[4]);
+}
+const BG = hexToRgb("#141113");
+
+const TR = { active: false, t0: 0, dur: 3.5, ghost: null, mix: null, seed: 0 };
+function copyToGhost() {
+  if (!view) return false;
+  if (!TR.ghost || TR.ghost.w !== view.w || TR.ghost.h !== view.h) { freeTarget(TR.ghost); TR.ghost = makeTarget(view.w, view.h, VIEWF, true); }
+  gl.useProgram(progCopy.p); bindTex(0, view); gl.uniform1i(progCopy.u.uSrc, 0); gl.uniform2f(progCopy.u.uOut, view.w, view.h);
+  drawQuad(TR.ghost);
+  return true;
+}
+function render(time) {
+  // view pass
+  gl.useProgram(progView.p);
+  bindTex(0, S.mode === "pl" ? field : ping[0]); gl.uniform1i(progView.u.uSrc, 0);
+  bindTex(1, S.mode === "sl" ? ping[1] : (S.mode === "pl" ? field : ping[0])); gl.uniform1i(progView.u.uPrev, 1);
+  gl.uniform1f(progView.u.uPhase, S.mode === "sl" ? (S.paused ? 1 : Math.min(1, Math.max(0, slAcc))) : 1);
+  gl.uniform1i(progView.u.uMode, MODE_IDX[S.mode]); gl.uniform1f(progView.u.uDensity, P.pl.density);
+  drawQuad(view);
+  // during a system change, dissolve the old system's shapes into the new one
+  let disp = view;
+  if (TR.active) {
+    const pr = (time - TR.t0) / TR.dur;
+    if (pr >= 1 || pr < 0) TR.active = false;
+    else {
+      if (!TR.mix || TR.mix.w !== view.w || TR.mix.h !== view.h) { freeTarget(TR.mix); TR.mix = makeTarget(view.w, view.h, VIEWF, true); }
+      gl.useProgram(progDissolve.p); const ud = progDissolve.u;
+      bindTex(0, view); gl.uniform1i(ud.uNew, 0); bindTex(1, TR.ghost); gl.uniform1i(ud.uOld, 1);
+      gl.uniform2f(ud.uOut, view.w, view.h); gl.uniform1f(ud.uP, pr * pr * (3 - 2 * pr)); gl.uniform1f(ud.uSeed, TR.seed);
+      drawQuad(TR.mix); disp = TR.mix;
+    }
+  }
+  // display pass
+  const u = progDisp.u, mp = P[S.mode];
+  gl.useProgram(progDisp.p);
+  bindTex(0, disp); gl.uniform1i(u.uView, 0);
+  gl.uniform2f(u.uRes, canvas.width, canvas.height); gl.uniform1f(u.uTime, time);
+  paletteNow(); gl.uniform3fv(u.uPal, palFlat); gl.uniform3fv(u.uBg, BG);
+  const R = aR(), bass = AU.bass * R, mid = AU.mid * R, high = AU.high * R;
+  gl.uniform1f(u.uGrain, look.grain + high * 0.05); gl.uniform1f(u.uGlow, look.glow * (1 + bass * 0.3)); gl.uniform1f(u.uTilt, look.tilt);
+  gl.uniform1f(u.uRim, look.rim + mid * 0.25); gl.uniform1f(u.uDrift, look.drift);
+  gl.uniform1f(u.uEdge, Math.max(0.03, mp.edge - bass * 0.025)); gl.uniform1f(u.uSoft, mp.soft);
+  gl.uniform1f(u.uShift, AU.pulse * music.react * 0.025 + (SG.active ? (SG.E - 0.5) * 0.3 * SG.a : 0));
+  gl.uniform1f(u.uHueMix, S.mode === "pl" ? 0.8 : 0.0);
+  gl.uniform1f(u.uDepth, S.mode === "sl" ? 1.0 : S.mode === "gs" ? 0.6 : 0.0);
+  gl.uniform1f(u.uBoxOn, 1.0);
+  gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1);
+  gl.uniform1f(u.uGrainAnim, reduceMotion ? 0.0 : 1.0);
+  drawQuad(null);
+}
+
+/* ---------------- sizing + loop ---------------- */
+let rebuildTimer = 0, lastW = 0, lastH = 0;
+function sizeCanvas() {
+  // portraits render at higher resolution so the saved image is large and sharp
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  const w = Math.max(64, Math.floor(canvas.clientWidth * dpr)), h = Math.max(64, Math.floor(canvas.clientHeight * dpr));
+  if (w !== lastW || h !== lastH) {
+    lastW = w; lastH = h; canvas.width = w; canvas.height = h;
+    return true;
+  }
+  return false;
+}
+window.addEventListener("resize", () => {
+  clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(() => { if (sizeCanvas()) setupMode(); }, 180);
+});
+
+/* ---------------- music ---------------- */
+const music = { react: 1, push: 1, beats: true, sens: 0.5 };
+const AU = { ctx: null, an: null, data: null, out: null, buf: null, src: null, demo: null, mode: null, name: "",
+  playing: false, bass: 0, mid: 0, high: 0, level: 0, pulse: 0, avg: 0, last: 0, beatNow: false };
+function aR() { return AU.playing ? music.react : 0; }
+function ensureCtx() {
+  if (!AU.ctx) {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return false;
+    AU.ctx = new C();
+    AU.an = AU.ctx.createAnalyser(); AU.an.fftSize = 1024; AU.an.smoothingTimeConstant = 0.55;
+    AU.out = AU.ctx.createGain(); AU.out.connect(AU.an); AU.an.connect(AU.ctx.destination);
+    AU.data = new Uint8Array(AU.an.frequencyBinCount);
+  }
+  return true;
+}
+function stopSources() {
+  if (AU.src) { try { AU.src.stop(); } catch (e) {} AU.src.disconnect(); AU.src = null; }
+  if (AU.demo) { clearInterval(AU.demo.timer); AU.demo.bus.disconnect(); AU.demo = null; }
+}
+function setTrack(text, on) { const t = $("track"); t.textContent = text; t.classList.toggle("on", !!on); }
+function syncPlay() {
+  const b = $("play"); b.disabled = !AU.mode || PR.running; b.textContent = AU.playing ? "Pause" : "Play";
+  $("portrait").disabled = !AU.buf || PR.running;
+}
+async function playSong(file) {
+  if (!ensureCtx()) { setTrack("This browser can't play audio through the page."); return; }
+  if (PR.running) cancelPortrait();
+  setTrack("Loading " + file.name + "…");
+  try {
+    const raw = await file.arrayBuffer();
+    const buf = await AU.ctx.decodeAudioData(raw);
+    stopSources(); AU.buf = buf; AU.mode = "song"; AU.name = file.name;
+    startSong();
+  } catch (e) {
+    setTrack("Couldn't read that file as audio. Try an MP3, WAV or M4A.");
+  }
+}
+function startSong() {
+  const src = AU.ctx.createBufferSource(); src.buffer = AU.buf; src.loop = true; src.connect(AU.out); src.start();
+  AU.src = src; AU.ctx.resume(); AU.playing = true;
+  setTrack("Playing: " + AU.name, true); syncPlay();
+}
+// A small synthesized beat (120 BPM) so the reaction can be tried without a file.
+function startDemo() {
+  if (!ensureCtx()) return;
+  stopSources(); AU.mode = "demo"; AU.name = "Demo beat";
+  const ctx = AU.ctx, bus = ctx.createGain(); bus.gain.value = 0.55; bus.connect(AU.out);
+  const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const nd = noise.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const step = 60 / 120 / 4; let next = ctx.currentTime + 0.08, k = 0;
+  const bassNotes = [55, 55, 0, 55, 65.41, 0, 49, 0, 55, 0, 55, 73.42, 65.41, 0, 49, 41.2];
+  function hit(t, n) {
+    if (n % 4 === 0 || n === 10) { // kick
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.13);
+      g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+      o.connect(g).connect(bus); o.start(t); o.stop(t + 0.4);
+    }
+    if (n === 4 || n === 12) { // clap
+      const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = noise; f.type = "bandpass"; f.frequency.value = 1600; f.Q.value = 0.8;
+      g.gain.setValueAtTime(0.55, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      s.connect(f).connect(g).connect(bus); s.start(t, Math.random() * 0.5); s.stop(t + 0.22);
+    }
+    if (n % 2 === 1) { // hat
+      const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = noise; f.type = "highpass"; f.frequency.value = 7500;
+      g.gain.setValueAtTime(n % 4 === 3 ? 0.22 : 0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      s.connect(f).connect(g).connect(bus); s.start(t, Math.random() * 0.5); s.stop(t + 0.06);
+    }
+    const fq = bassNotes[n];
+    if (fq) { // bass
+      const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = "sawtooth"; o.frequency.value = fq; f.type = "lowpass"; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.2);
+      g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+      o.connect(f).connect(g).connect(bus); o.start(t); o.stop(t + 0.26);
+    }
+  }
+  const timer = setInterval(() => { while (next < ctx.currentTime + 0.12) { hit(next, k % 16); next += step; k++; } }, 25);
+  AU.demo = { timer, bus };
+  ctx.resume(); AU.playing = true;
+  setTrack("Playing: demo beat (120 BPM)", true); syncPlay();
+}
+function toggleMusic() {
+  if (!AU.mode) return;
+  if (AU.mode === "song" && !AU.src && !PR.running) { startSong(); return; }
+  if (AU.playing) { AU.ctx.suspend(); AU.playing = false; setTrack("Paused: " + AU.name, false); }
+  else { AU.ctx.resume(); AU.playing = true; setTrack("Playing: " + AU.name, true); }
+  syncPlay();
+}
+function audioUpdate() {
+  AU.beatNow = false; AU.beatHit = false;
+  if (!AU.playing || !AU.an) {
+    AU.bass *= 0.9; AU.mid *= 0.9; AU.high *= 0.9; AU.level *= 0.9; AU.pulse *= 0.9; return;
+  }
+  AU.an.getByteFrequencyData(AU.data);
+  const binHz = AU.ctx.sampleRate / AU.an.fftSize, d = AU.data;
+  const band = (lo, hi) => {
+    let s = 0, n = 0; const a = Math.max(1, Math.floor(lo / binHz)), b = Math.min(d.length - 1, Math.ceil(hi / binHz));
+    for (let i = a; i <= b; i++) { s += d[i]; n++; } return n ? s / n / 255 : 0;
+  };
+  const b = band(25, 150), m = band(150, 2000), h = band(2000, 9000);
+  AU.bass += (b - AU.bass) * 0.55; AU.mid += (m - AU.mid) * 0.35; AU.high += (h - AU.high) * 0.45;
+  AU.level = (AU.bass + AU.mid + AU.high) / 3;
+  AU.avg = AU.avg * 0.94 + b * 0.06;
+  const now = performance.now();
+  // spectral flux: how much the spectrum jumped up since last frame (catches snares, plucks, vocal attacks)
+  if (!AU.prev) AU.prev = new Uint8Array(d.length);
+  let flux = 0; const top = Math.min(d.length, 300);
+  for (let i = 1; i < top; i++) { const df = d[i] - AU.prev[i]; if (df > 0) flux += df; }
+  flux /= top * 40; AU.prev.set(d);
+  AU.favg = (AU.favg || 0) * 0.94 + flux * 0.06;
+  // Beat sensitivity (0..1, default 0.5) lowers every threshold
+  const sv = music.sens;
+  const ratio = 1.35 - 0.34 * sv, add = 0.05 - 0.04 * sv, floor = 0.42 - 0.3 * sv, cool = 260 - 140 * sv;
+  const bassHit = b > AU.avg * ratio + add && b > floor;
+  const fluxHit = flux > AU.favg * (1.9 - 0.9 * sv) + 0.04 * (1 - sv) && flux > 0.12 - 0.1 * sv;
+  if ((bassHit || fluxHit) && now - AU.last > cool) { AU.beatStr = Math.max(b - AU.avg, (flux - AU.favg) * 0.6); AU.last = now; AU.pulse = 1; AU.beatHit = true; AU.beatNow = music.beats; }
+  AU.pulse *= 0.9;
+}
+const meter = document.getElementById("meter"), mctx = meter.getContext("2d");
+function drawMeter() {
+  if ($("panel").hidden) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = Math.round(meter.clientWidth * dpr), h = Math.round(meter.clientHeight * dpr);
+  if (!w) return;
+  if (meter.width !== w || meter.height !== h) { meter.width = w; meter.height = h; }
+  mctx.clearRect(0, 0, w, h);
+  const bars = 32, gap = 2 * dpr, bw = (w - gap * (bars - 1)) / bars;
+  const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#f6c453";
+  for (let i = 0; i < bars; i++) {
+    let v = 0;
+    if (AU.data && AU.playing) { const a = Math.floor(Math.pow(i / bars, 1.8) * 300) + 1, b = Math.floor(Math.pow((i + 1) / bars, 1.8) * 300) + 1; for (let j = a; j <= b; j++) v = Math.max(v, AU.data[j]); v /= 255; }
+    const bh = Math.max(1.5 * dpr, v * (h - 11 * dpr));
+    mctx.fillStyle = v > 0 ? accent : "#3a3036";
+    mctx.globalAlpha = v > 0 ? 0.35 + 0.65 * v : 1;
+    mctx.fillRect(i * (bw + gap), h - bh, bw, bh);
+  }
+  mctx.globalAlpha = 1;
+  // beat light: flashes on every detected beat
+  const r = 4 * dpr, cx = w - r - 1, cy = r + 1;
+  mctx.beginPath(); mctx.arc(cx, cy, r, 0, Math.PI * 2);
+  mctx.fillStyle = AU.playing && AU.pulse > 0.05 ? accent : "#3a3036";
+  mctx.globalAlpha = AU.playing ? 0.3 + 0.7 * AU.pulse : 1; mctx.fill(); mctx.globalAlpha = 1;
+}
+
+/* ---------------- beat motion ---------------- */
+const IMP = []; const toss = [0, 0];
+const impBuf = new Float32Array(24), swBuf = new Float32Array(6);
+function motionUpdate(dt) {
+  for (const m of IMP) m.age += dt;
+  while (IMP.length && IMP[0].age > 1.25) IMP.shift();
+  const decay = Math.pow(0.88, dt * 60); toss[0] *= decay; toss[1] *= decay;
+  if (AU.beatHit && music.push > 0) {
+    const s = music.push * (0.6 + AU.bass);
+    IMP.push({ x: rand(BOX.x0 + 0.08, BOX.x1 - 0.08), y: rand(BOX.y0 + 0.08, BOX.y1 - 0.08), str: 0.011 * s, age: 0, swirl: rand(-0.85, 0.85) });
+    if (IMP.length > 6) IMP.shift();
+    if (!PR.running) { const a = rand(0, Math.PI * 2); toss[0] += Math.cos(a) * 0.003 * s; toss[1] += Math.sin(a) * 0.003 * s; }
+  }
+}
+function motionActive() { return IMP.length > 0 || Math.abs(toss[0]) + Math.abs(toss[1]) > 2e-5; }
+// velocity at a point (uv, y up) in screen-height units per frame; mirrors the shader
+function fieldVel(x, y) {
+  let vx = toss[0], vy = toss[1];
+  for (const m of IMP) {
+    const dx = (x - m.x) * aspect, dy = y - m.y, r = Math.hypot(dx, dy) + 1e-4;
+    const R = m.age * 0.6, w = 0.07 + m.age * 0.06;
+    const prof = Math.exp(-(((r - R) / w) ** 2)) + (m.age <= 0.25 ? 0.35 * Math.exp(-r * r / 0.01) : 0);
+    const fade = Math.max(1 - m.age / 1.2, 0) ** 2, k = prof * fade * m.str, sw = m.swirl, ux = dx / r, uy = dy / r;
+    vx += (ux * (1 - Math.abs(sw)) - uy * sw) * k; vy += (uy * (1 - Math.abs(sw)) + ux * sw) * k;
+  }
+  return [vx, vy];
+}
+function advect() {
+  if (!motionActive()) return;
+  impBuf.fill(0); swBuf.fill(0);
+  const gentle = S.mode === "sl" ? 0.35 : 1; // beat pushes smear SmoothLife's fine structure, so push it more gently
+  IMP.forEach((m, i) => { impBuf.set([m.x, m.y, m.str * gentle, m.age], i * 4); swBuf[i] = m.swirl; });
+  gl.useProgram(progAdv.p); const u = progAdv.u;
+  bindTex(0, ping[0]); gl.uniform1i(u.uState, 0);
+  gl.uniform2i(u.uSize, ping[0].w, ping[0].h); gl.uniform1f(u.uAspect, aspect);
+  gl.uniform4fv(u.uImp, impBuf); gl.uniform1fv(u.uSwirl, swBuf); gl.uniform1i(u.uN, IMP.length);
+  gl.uniform2f(u.uToss, toss[0] * gentle, toss[1] * gentle);
+  gl.uniform2i(u.uOut, ping[0].w, ping[0].h); gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1); gl.uniform1f(u.uWallFade, PR.running ? 1 : 0);
+  drawQuad(ping[1]); ping.reverse();
+}
+
+/* ---------------- song steering ----------------
+   Two slow-moving descriptions of the music, each normalized to this song's own range:
+   energy (loud vs quiet) and brightness (airy/trebly vs dark/bassy).
+   They shift the rules around the slider values; the sliders themselves never move. */
+const SG = { on: true, soft: 0.4, full: 1.5, a: 1, hue: 90, active: false, E: 0.5, C: 0.5, eLo: 1, eHi: 0, cLo: 1, cHi: 0, lastResize: -10 };
+const clamp01 = x => Math.min(1, Math.max(0, x));
+function steerUpdate(dt) {
+  SG.active = SG.on && AU.playing && !!AU.an;
+  const k = 1 - Math.exp(-dt / 1.6);
+  // features are measured whenever music plays (section detection needs them); they only steer when SG.active
+  if (!(AU.playing && AU.an)) { SG.E += (0.5 - SG.E) * k; SG.C += (0.5 - SG.C) * k; return; }
+  const d = AU.data, binHz = AU.ctx.sampleRate / AU.an.fftSize; let num = 0, den = 0;
+  for (let i = 1; i < d.length; i++) { num += i * d[i]; den += d[i]; }
+  const cHz = den > 0 ? (num / den) * binHz : 300;
+  const c = clamp01(Math.log(Math.max(cHz, 200) / 300) / Math.log(4000 / 300)), e = AU.level;
+  SG.cRaw = c; SG.eRaw = e;
+  SG.eLo = Math.min(SG.eLo + dt * 0.01, e); SG.eHi = Math.max(SG.eHi - dt * 0.01, e);
+  SG.cLo = Math.min(SG.cLo + dt * 0.01, c); SG.cHi = Math.max(SG.cHi - dt * 0.01, c);
+  SG.E += (clamp01((e - SG.eLo) / Math.max(0.08, SG.eHi - SG.eLo)) - SG.E) * k;
+  SG.C += (clamp01((c - SG.cLo) / Math.max(0.06, SG.cHi - SG.cLo)) - SG.C) * k;
+  // steering strength follows the song: gentle in soft passages, strong in full ones
+  SG.a = SG.soft + (SG.full - SG.soft) * SG.E;
+}
+// Reaction: brightness walks feed/kill from mazes and spots (dark) to dense dividing cells (bright)
+function gsFK() {
+  let f = P.gs.f, kk = P.gs.k;
+  if (SG.active) { const x = (SG.C * 2 - 1) * SG.a; if (x < 0) { f += 0.0107 * x; kk += 0.0039 * x; } else { f += 0.0093 * x; kk -= 0.0019 * x; } }
+  return [Math.max(0.005, f), kk];
+}
+// energy sets pattern scale: loud passages grow bigger, bolder shapes
+function gsTargetScale() { return SG.active ? Math.min(4, Math.max(1, Math.round((P.gs.scale + (SG.E - 0.5) * 1.8 * SG.a) * 4) / 4)) : P.gs.scale; }
+// SmoothLife is fragile: its creature size stays fixed during music (changing it live breaks the creatures),
+// and the song only nudges the survival rule toward livelier settings, never toward dying out
+function slRa() { return P.sl.ra | 0; }
+function slD2() { return SG.active ? P.sl.d2 + Math.min(0.02, Math.max(0, (SG.C - 0.5) * 0.03 * SG.a)) : P.sl.d2; }
+function plBlob() { return SG.active ? P.pl.blob * (1 + (SG.E - 0.5) * 0.7 * SG.a) : P.pl.blob; }
+function plRmax() { return SG.active ? P.pl.rmax * (1 + (SG.C - 0.5) * 0.4 * SG.a) : P.pl.rmax; }
+// color: brightness crossfades toward the next palette in the list; energy slides along the ramp (in render)
+function paletteNow() {
+  const a = PALETTES[S.pal].stops, b = PALETTES[(S.pal + 1) % PALETTES.length].stops;
+  const m = SG.active ? clamp01(SG.C * SG.a * 0.85) : 0;
+  // hue turns around the color wheel with the sound: brightness does most of it, energy the rest
+  const deg = SG.active ? ((SG.C - 0.5) * 1.2 + (SG.E - 0.5) * 0.8) * SG.hue : 0;
+  for (let i = 0; i < 6; i++) {
+    const ca = hexToRgb(a[i]), cb = hexToRgb(b[i]), mixd = [0, 1, 2].map(j => ca[j] + (cb[j] - ca[j]) * m);
+    const r = deg ? hueRotate(mixd, deg) : mixd;
+    palFlat.set(r, i * 3);
+  }
+}
+// luminance-preserving hue rotation (same math as the CSS hue-rotate filter)
+function hueRotate(c, deg) {
+  const a = deg * Math.PI / 180, co = Math.cos(a), si = Math.sin(a), [r, g, b] = c;
+  const o = [
+    r * (0.213 + co * 0.787 - si * 0.213) + g * (0.715 - co * 0.715 - si * 0.715) + b * (0.072 - co * 0.072 + si * 0.928),
+    r * (0.213 - co * 0.213 + si * 0.143) + g * (0.715 + co * 0.285 + si * 0.140) + b * (0.072 - co * 0.072 - si * 0.283),
+    r * (0.213 - co * 0.213 - si * 0.787) + g * (0.715 - co * 0.715 + si * 0.715) + b * (0.072 + co * 0.928 + si * 0.072),
+  ];
+  return o.map(v => Math.min(1, Math.max(0, v)));
+}
+// resample the reaction to a new pattern scale without losing what's on screen
+function resizeGS(scale) {
+  const h = Math.round(560 / scale), w = Math.max(16, Math.round(h * aspect));
+  const np = [makeTarget(w, h, SIMF, false), makeTarget(w, h, SIMF, false)];
+  gl.useProgram(progAdv.p); const u = progAdv.u;
+  bindTex(0, ping[0]); gl.uniform1i(u.uState, 0);
+  gl.uniform2i(u.uSize, ping[0].w, ping[0].h); gl.uniform2i(u.uOut, w, h); gl.uniform1f(u.uAspect, aspect);
+  gl.uniform1i(u.uN, 0); gl.uniform2f(u.uToss, 0, 0); gl.uniform1f(u.uWallFade, 0); gl.uniform4f(u.uBox, 0, 0, 1, 1);
+  drawQuad(np[0]);
+  freeTarget(ping[0]); freeTarget(ping[1]); freeTarget(view);
+  ping = np; view = makeTarget(w, h, VIEWF, true); S.gsScale = scale;
+}
+function steerScale(time) {
+  if (S.mode !== "gs" || !ping) return;
+  const tgt = gsTargetScale();
+  if (Math.abs(tgt - S.gsScale) >= 0.5 && time - SG.lastResize > 2.5) { SG.lastResize = time; resizeGS(tgt); }
+}
+
+/* ---------------- song portrait ----------------
+   Each frame covers one slice of the song: a long exposure of everything that moved during the slice,
+   with a crisp snapshot taken just after the slice's strongest beat laid on top.
+   When the sound's character shifts (a new section), the grid starts a new labeled row. */
+const PR = { running: false, ended: false, frames: 16, cells: [], start: 0, dur: 0, mode: "", sections: [0], blob: null, url: null, title: "", style: "fluid", timeline: [], saved: null };
+const NOV = { eS: 0, eL: 0, cS: 0, cL: 0, bS: 0, bL: 0, mean: 0.02, init: false, last: 0 };
+const fmtTime = t => { t = Math.max(0, Math.round(t)); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); };
+const SAMPLE_DT = 0.05, INK = "#141113";
+const secLetter = i => i < 26 ? String.fromCharCode(65 + i) : "S" + (i + 1);
+function newCanvas(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+function cropRect() {
+  const W = canvas.width, H = canvas.height, ins = Math.round(6 * Math.min(window.devicePixelRatio || 1, 1.5));
+  return { sx: Math.round(BOX.x0 * W) + ins, sy: Math.round((1 - BOX.y1) * H) + ins,
+           sw: Math.round((BOX.x1 - BOX.x0) * W) - 2 * ins, sh: Math.round((BOX.y1 - BOX.y0) * H) - 2 * ins };
+}
+function grabInto(cv, op) {
+  const r = cropRect(), g = cv.getContext("2d");
+  g.globalCompositeOperation = op || "source-over";
+  g.drawImage(canvas, r.sx, r.sy, r.sw, r.sh, 0, 0, cv.width, cv.height);
+  g.globalCompositeOperation = "source-over";
+}
+function makeCell(i) {
+  const r = cropRect(), w = Math.min(r.sw, 900), h = Math.round(w * r.sh / r.sw);
+  const acc = newCanvas(w, h), g = acc.getContext("2d"); g.fillStyle = INK; g.fillRect(0, 0, w, h);
+  const win = PR.dur / PR.frames, expected = Math.max(4, win / SAMPLE_DT);
+  // fade per sample so the oldest trail in the slice ends at about a fifth of full strength
+  return { i, acc, peak: null, best: -1, pending: -1, peakT: (i + 0.5) * win, lastSample: -1, fade: 1 - Math.pow(0.22, 1 / expected) };
+}
+function sampleTrail(c, el) {
+  const g = c.acc.getContext("2d");
+  g.globalAlpha = c.fade; g.fillStyle = INK; g.fillRect(0, 0, c.acc.width, c.acc.height); g.globalAlpha = 1;
+  grabInto(c.acc, "lighten");
+  c.lastSample = el;
+}
+function snapPeak(c, t) { if (!c.peak) c.peak = newCanvas(c.acc.width, c.acc.height); grabInto(c.peak); c.peakT = t; }
+// section detection: compare the last ~1.5 s of sound with the last ~8 s; a big gap means the song changed character
+function noveltyUpdate(dt, el) {
+  const e = SG.eRaw || 0, c = SG.cRaw || 0, b = AU.level > 0.02 ? Math.min(1, AU.bass / (AU.level * 2)) : 0;
+  if (!NOV.init) { NOV.eS = NOV.eL = e; NOV.cS = NOV.cL = c; NOV.bS = NOV.bL = b; NOV.init = true; }
+  const ks = 1 - Math.exp(-dt / 1.5), kl = 1 - Math.exp(-dt / 8);
+  NOV.eS += (e - NOV.eS) * ks; NOV.eL += (e - NOV.eL) * kl;
+  NOV.cS += (c - NOV.cS) * ks; NOV.cL += (c - NOV.cL) * kl;
+  NOV.bS += (b - NOV.bS) * ks; NOV.bL += (b - NOV.bL) * kl;
+  const nov = Math.abs(NOV.eS - NOV.eL) * 1.5 + Math.abs(NOV.cS - NOV.cL) + Math.abs(NOV.bS - NOV.bL) * 0.5;
+  NOV.mean += (nov - NOV.mean) * (1 - Math.exp(-dt / 20));
+  const minGap = Math.max(8, 3 * PR.dur / PR.frames);
+  if (el - NOV.last > minGap && el > 4 && PR.dur - el > minGap * 0.5 && nov > Math.max(0.09, NOV.mean * 3.2)) {
+    NOV.last = el; PR.sections.push(Math.max(0, el - 1.2)); // the detector hears a change ~1 s after it starts
+    if (PR.running && AD.on) directSystem(el);
+    NOV.eL = NOV.eS; NOV.cL = NOV.cS; NOV.bL = NOV.bS;
+  }
+}
+/* ---------------- song directs the system ----------------
+   At the start and at each new section the page picks a system and preset from how that part sounds:
+   quiet and sparse -> SmoothLife creatures, steady middle -> reaction-diffusion cells,
+   loud or beat-heavy -> particle life. Brightness picks the preset within the system.
+   The new system grows out of the shapes already on screen. */
+const AD = { on: true, beats: [], first: false };
+const SYS_NAME = { sl: "SmoothLife", gs: "Reaction", pl: "Particles" };
+function chooseStyle() {
+  const now = AU.ctx ? AU.ctx.currentTime - PR.start : 0, br = AD.beats.filter(t => t > now - 8).length / 8;
+  const C = SG.C, E = 0.5 * SG.E + 0.5 * clamp01((NOV.eS - 0.08) / 0.4);
+  const sys = (E < 0.38 && br < 1.2) ? "sl" : (E > 0.66 || br > 2.2) ? "pl" : "gs";
+  const band = C < 0.35 ? 0 : C > 0.65 ? 2 : 1;
+  const pick = { sl: [3, 0, 1], gs: [3, 0, 2], pl: [1, 0, 2] }[sys][band]; // index into MODES[sys].presets
+  return { sys, preset: pick };
+}
+function readShapeField() {
+  if (!view) return null;
+  const w = view.w, h = view.h, buf = new Float32Array(w * h * 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, view.fbo); gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, buf);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return (u, v) => buf[(Math.min(h - 1, Math.max(0, Math.floor(v * h))) * w + Math.min(w - 1, Math.max(0, Math.floor(u * w)))) * 4];
+}
+// if SmoothLife is nearly empty, re-seed it before it dies out
+let slCheckT = 0, slBuf = null;
+function slLifeCheck(time) {
+  if (time - slCheckT < 1 || !view) return; slCheckT = time;
+  const w = view.w, h = view.h; if (!slBuf || slBuf.length !== w * h * 4) slBuf = new Float32Array(w * h * 4);
+  try { gl.bindFramebuffer(gl.FRAMEBUFFER, view.fbo); gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, slBuf); } catch (e) { return; } finally { gl.bindFramebuffer(gl.FRAMEBUFFER, null); }
+  let sum = 0; for (let i = 0; i < slBuf.length; i += 16) sum += slBuf[i];
+  if (sum / (slBuf.length / 16) < 0.02) slDrop(6);
+}
+function carryOver(newMode) {
+  try { if (copyToGhost()) { TR.active = true; TR.t0 = lastT; TR.seed = Math.random() * 20; } } catch (e) { TR.active = false; }
+  let field = null; try { field = readShapeField(); } catch (e) { field = null; }
+  S.mode = newMode; S.flip = false; buildModeUI(); setupMode();
+  if (!field) return;
+  if (newMode === "sl" || newMode === "gs") {
+    const t = ping[0], d = new Float32Array(t.w * t.h * 4);
+    for (let y = 0; y < t.h; y++) for (let x = 0; x < t.w; x++) {
+      const i = (y * t.w + x) * 4, v = field((x + 0.5) / t.w, (y + 0.5) / t.h);
+      d[i] = 1; d[i + 3] = 1;
+    }
+    if (newMode === "gs") {
+      // reaction-diffusion can't grow from big solid areas, only from small spots: place them inside the old shapes
+      const n = Math.round(t.w * t.h * (BOX.x1 - BOX.x0) * (BOX.y1 - BOX.y0) / 900) + 10;
+      for (let k = 0, tries = 0; k < n && tries < n * 30; tries++) {
+        const u = rand(BOX.x0 + 0.03, BOX.x1 - 0.03), v = rand(BOX.y0 + 0.04, BOX.y1 - 0.04);
+        if (field(u, v) < 0.3 && Math.random() < 0.7) continue;
+        const cx = u * t.w, cy = v * t.h, r = rand(2.5, 6); k++;
+        for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+          if (x < 0 || y < 0 || x >= t.w || y >= t.h || (x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+          const i = (y * t.w + x) * 4; d[i] = 0.5; d[i + 1] = 0.25 + Math.random() * 0.1;
+        }
+      }
+      upload(t, d); upload(ping[1], d);
+    }
+    else {
+      // SmoothLife grows best from solid squares: drop them where the previous system had shapes
+      const sq = P.sl.ra | 0, block = new Float32Array(sq * sq * 4);
+      for (let i = 0; i < sq * sq; i++) { block[i * 4] = 1; block[i * 4 + 3] = 1; }
+      let placed = 0;
+      for (let tries = 0; tries < 2000 && placed < 40; tries++) {
+        const u = rand(BOX.x0 + 0.02, BOX.x1 - 0.02), v = rand(BOX.y0 + 0.03, BOX.y1 - 0.03);
+        if (field(u, v) < 0.3) continue;
+        const x = Math.round(u * t.w - sq / 2), y = Math.round(v * t.h - sq / 2);
+        if (x < 2 || y < 2 || x + sq > t.w - 2 || y + sq > t.h - 2) continue;
+        upload(t, block, x, y, sq, sq); placed++;
+      }
+    }
+  } else {
+    for (let i = 0; i < PL.n; i++) {
+      let u = 0, v = 0;
+      for (let k = 0; k < 30; k++) { u = rand(BOX.x0, BOX.x1); v = rand(BOX.y0, BOX.y1); if (field(u, v) > 0.3) break; }
+      PL.X[i] = u * aspect; PL.Y[i] = v;
+    }
+  }
+}
+/* Whole-song analysis, done once when a portrait starts: loudness, brightness (treble vs bass), bass weight,
+   beat density and pauses, measured every 0.1 s. The song is cut into at least 5 segments where those
+   change most (pauses count extra), and each segment gets the system that fits its sound. Neighbouring
+   segments never share a system and all three systems are used. */
+function analyzeSong(buf) {
+  const sr = buf.sampleRate, n = buf.length, c0 = buf.getChannelData(0), c1 = buf.numberOfChannels > 1 ? buf.getChannelData(1) : null;
+  const hop = Math.max(1, Math.round(sr * 0.1)), H = Math.max(1, Math.floor(n / hop)), dur = buf.duration;
+  const L = new Float32Array(H), BR = new Float32Array(H), BA = new Float32Array(H), ON = new Float32Array(H);
+  const aLo = Math.exp(-2 * Math.PI * 200 / sr), aHi = Math.exp(-2 * Math.PI * 2000 / sr);
+  let lp = 0, lp2 = 0;
+  for (let h = 0; h < H; h++) {
+    let e = 0, el = 0, eh = 0; const s0 = h * hop;
+    for (let i = s0; i < s0 + hop; i++) {
+      const x = c1 ? (c0[i] + c1[i]) * 0.5 : c0[i];
+      lp = lp * aLo + x * (1 - aLo); lp2 = lp2 * aHi + x * (1 - aHi);
+      const hp = x - lp2; e += x * x; el += lp * lp; eh += hp * hp;
+    }
+    const r = Math.sqrt(e / hop); L[h] = r; BR[h] = Math.sqrt(eh / hop) / (r + 1e-6); BA[h] = Math.sqrt(el / hop) / (r + 1e-6);
+  }
+  let avg = 0;
+  for (let h = 0; h < H; h++) { if (h > 0 && L[h] > avg * 1.25 + 0.004 && L[h] > L[h - 1]) ON[h] = 1; avg = avg * 0.8 + L[h] * 0.2; }
+  const smooth = (arr, w) => { const ps = new Float64Array(arr.length + 1); for (let i = 0; i < arr.length; i++) ps[i + 1] = ps[i] + arr[i];
+    return Float32Array.from(arr, (_, i) => { const a = Math.max(0, i - w), b = Math.min(arr.length, i + w + 1); return (ps[b] - ps[a]) / (b - a); }); };
+  const norm = arr => { const s = Array.from(arr).sort((a, b) => a - b), lo = s[Math.floor(s.length * 0.05)], hi = s[Math.min(s.length - 1, Math.floor(s.length * 0.95))];
+    return Float32Array.from(arr, v => clamp01((v - lo) / Math.max(1e-6, hi - lo))); };
+  const F = [norm(smooth(L, 10)), norm(smooth(BR, 10)), norm(smooth(BA, 10)), norm(smooth(ON, 20))]; // loud, bright, bass, busy
+  // novelty: difference between the 4 s before and the 4 s after each moment
+  const W = 40, PS = F.map(f => { const ps = new Float64Array(H + 1); for (let i = 0; i < H; i++) ps[i + 1] = ps[i] + f[i]; return ps; });
+  const nov = new Float32Array(H);
+  for (let h = W; h < H - W; h++) { let d = 0; for (const ps of PS) { const a = (ps[h] - ps[h - W]) / W, b = (ps[h + W] - ps[h]) / W; d += (a - b) * (a - b); } nov[h] = Math.sqrt(d); }
+  // pauses: a stretch of near-silence makes the moment right after it a strong place to change
+  const med = Array.from(L).sort((a, b) => a - b)[Math.floor(H / 2)] || 0; let run = 0;
+  for (let h = 0; h < H; h++) { if (L[h] < med * 0.12) run++; else { if (run >= 4) nov[h] += 1; run = 0; } }
+  const K = Math.max(5, Math.min(12, Math.round(dur / 22)));
+  const minGap = Math.max(2.5, Math.min(8, dur / (K * 1.8)));
+  const peaks = [];
+  for (let h = 1; h < H - 1; h++) { let isMax = true; for (let j = Math.max(0, h - 10); j <= Math.min(H - 1, h + 10); j++) if (nov[j] > nov[h]) { isMax = false; break; } if (isMax && nov[h] > 0) peaks.push(h); }
+  peaks.sort((a, b) => nov[b] - nov[a]);
+  const cuts = [];
+  for (const h of peaks) { const t = h * 0.1; if (t < minGap || dur - t < minGap) continue; if (cuts.every(x => Math.abs(x - t) >= minGap)) cuts.push(t); if (cuts.length >= K - 1) break; }
+  while (cuts.length < K - 1) { // steady song: split the longest stretch so there are still enough changes
+    const b = [0, ...cuts.sort((x, y) => x - y), dur]; let li = 0; for (let i = 1; i < b.length - 1; i++) if (b[i + 1] - b[i] > b[li + 1] - b[li]) li = i;
+    if (b[li + 1] - b[li] < 4) break; cuts.push((b[li] + b[li + 1]) / 2);
+  }
+  cuts.sort((x, y) => x - y);
+  const bounds = [0, ...cuts, dur];
+  const segs = [];
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const a = Math.floor(bounds[i] * 10), b = Math.max(a + 1, Math.min(H, Math.floor(bounds[i + 1] * 10)));
+    const mean = f => { let s = 0; for (let h = a; h < b; h++) s += f[h]; return s / (b - a); };
+    const [loud, bright, bass, busy] = F.map(mean);
+    const score = { sl: (1 - loud) * 1.2 + (1 - busy) * 0.8, gs: (1 - Math.abs(loud - 0.5) * 2) + bright * 0.4 + 0.2, pl: loud * 1.1 + busy * 0.9 + bass * 0.3 };
+    segs.push({ t0: bounds[i], t1: bounds[i + 1], loud, bright, bass, busy, score });
+  }
+  // pick systems: best fit for each segment, never the same as the previous segment
+  segs.forEach((g, i) => { const prev = i > 0 ? segs[i - 1].sys : null; g.sys = ["sl", "gs", "pl"].filter(m => m !== prev).sort((x, y) => g.score[y] - g.score[x])[0]; });
+  // make sure all three systems appear
+  for (const m of ["sl", "gs", "pl"]) {
+    if (segs.some(g => g.sys === m)) continue;
+    let bi = -1, bs = -1e9;
+    segs.forEach((g, i) => {
+      const ok = (i === 0 || segs[i - 1].sys !== m) && (i === segs.length - 1 || segs[i + 1].sys !== m) && segs.filter(x => x.sys === g.sys).length > 1;
+      if (ok && g.score[m] > bs) { bs = g.score[m]; bi = i; }
+    });
+    if (bi >= 0) segs[bi].sys = m;
+  }
+  segs.forEach(g => { const band = g.bright < 0.35 ? 0 : g.bright > 0.65 ? 2 : 1; g.preset = { sl: [0, 1, 2], gs: [3, 0, 2], pl: [1, 0, 2] }[g.sys][band]; });
+  return segs;
+}
+function applyStyle(el, sys, presetIdx) {
+  const pr = MODES[sys].presets[presetIdx];
+  if (sys !== S.mode) carryOver(sys);
+  if (pr.action) plRules(pr.action); else Object.assign(P[sys], pr.v);
+  S.preset[sys] = pr.action ? -1 : presetIdx; buildModeUI();
+  const last = PR.timeline[PR.timeline.length - 1];
+  if (!last || last.sys !== sys || last.preset !== pr.name) PR.timeline.push({ t: el, sys, preset: pr.name });
+  PR.lastChange = el;
+}
+function directSystem(el) {
+  const st = chooseStyle(), M = MODES[st.sys], pr = M.presets[st.preset];
+  if (st.sys !== S.mode) carryOver(st.sys);
+  if (pr.action) plRules(pr.action);
+  else { Object.assign(P[st.sys], pr.v); }
+  S.preset[st.sys] = pr.action ? -1 : st.preset; buildModeUI();
+  const last = PR.timeline[PR.timeline.length - 1];
+  if (!last || last.sys !== st.sys || last.preset !== pr.name) PR.timeline.push({ t: el, sys: st.sys, preset: pr.name });
+}
+
+/* ---------------- song image capture ----------------
+   The song is split into K slices. In each slice one moment is kept: just after the slice's strongest beat
+   (or at its end), never in the first second after a system change. What's kept is the moment's shape field
+   and its palette, so the final image can be re-drawn smoothly at large size. */
+const FL = { tex: null, fbo: null, W: 0, H: 0, K: 0, waves: 1, seam: 0.25, smooth: 1, slots: [], pals: [], seed: 0, aspect: 1.6 };
+function fluidInit() {
+  const r = cropRect();
+  // moment windows: with a plan, every segment gets at least 2 moments so each system has real space in the image
+  const wins = [];
+  if (PR.plan && PR.plan.length) {
+    const segs = PR.plan, n = segs.map(g => Math.max(2, Math.round(PR.frames * (g.t1 - g.t0) / PR.dur)));
+    let sum = n.reduce((a, b) => a + b, 0);
+    while (sum > PR.frames) { let bi = -1; n.forEach((v, i) => { if (v > 2 && (bi < 0 || v > n[bi])) bi = i; }); if (bi < 0) break; n[bi]--; sum--; }
+    while (sum < PR.frames) { let bi = 0; n.forEach((v, i) => { if ((segs[i].t1 - segs[i].t0) / v > (segs[bi].t1 - segs[bi].t0) / n[bi]) bi = i; }); n[bi]++; sum++; }
+    segs.forEach((g, i) => { for (let j = 0; j < n[i]; j++) wins.push([g.t0 + (g.t1 - g.t0) * j / n[i], g.t0 + (g.t1 - g.t0) * (j + 1) / n[i], i]); });
+  } else {
+    for (let j = 0; j < PR.frames; j++) wins.push([PR.dur * j / PR.frames, PR.dur * (j + 1) / PR.frames, Math.floor(j / 3)]);
+  }
+  const K = Math.min(24, wins.length); wins.length = K;
+  // the song image is always landscape, whatever the window shape
+  FL.aspect = 1.5; FL.W = 1024; FL.H = Math.max(64, Math.round(FL.W / FL.aspect)); FL.K = K; FL.seed = Math.random() * 50;
+  if (FL.tex) gl.deleteTexture(FL.tex);
+  FL.levels = Math.floor(Math.log2(Math.max(FL.W, FL.H))) + 1;
+  FL.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D_ARRAY, FL.tex);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY, FL.levels, gl.RGBA16F, FL.W, FL.H, K);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  if (!FL.fbo) FL.fbo = gl.createFramebuffer();
+  FL.slots = wins.map(w => ({ done: false, best: -1, pending: -1, t: 0, w0: w[0], w1: w[1], seg: w[2], sys: S.mode, preset: "" }));
+  FL.pals = Array.from({ length: K }, () => new Float32Array(18));
+}
+function captureLayer(k, t) {
+  if (!view) return;
+  // a 3:2 region from the middle of the frame, kept clear of the walls
+  let x0 = BOX.x0 + (BOX.x1 - BOX.x0) * 0.045, x1 = BOX.x1 - (BOX.x1 - BOX.x0) * 0.045;
+  let y0 = BOX.y0 + (BOX.y1 - BOX.y0) * 0.045, y1 = BOX.y1 - (BOX.y1 - BOX.y0) * 0.045;
+  const pw = (x1 - x0) * canvas.width, ph = (y1 - y0) * canvas.height;
+  if (pw / ph < FL.aspect) { const nh = pw / FL.aspect / canvas.height, cy = (y0 + y1) / 2; y0 = cy - nh / 2; y1 = cy + nh / 2; }
+  else { const nw = ph * FL.aspect / canvas.width, cx = (x0 + x1) / 2; x0 = cx - nw / 2; x1 = cx + nw / 2; }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, FL.fbo);
+  gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, FL.tex, 0, k);
+  gl.viewport(0, 0, FL.W, FL.H); gl.useProgram(progCap.p); const u = progCap.u;
+  bindTex(0, view); gl.uniform1i(u.uView, 0);
+  gl.uniform4f(u.uBox, x0, y0, x1, y1);
+  gl.uniform1f(u.uIsPL, S.mode === "pl" ? 1 : 0); gl.uniform2f(u.uOut, FL.W, FL.H);
+  gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  FL.pals[k].set(palFlat);
+  const sl = FL.slots[k]; sl.done = true; sl.t = t; sl.sys = S.mode;
+  const last = PR.timeline[PR.timeline.length - 1]; sl.preset = last ? last.preset : "";
+}
+function slotAt(el) { let i = 0; while (i < FL.K - 1 && el >= FL.slots[i].w1) i++; return i; }
+// position along the image (0..1) for a moment in the song, following the moment windows
+function timeToX(t) {
+  const i = slotAt(t), s0 = FL.slots[i];
+  return (i + Math.min(1, Math.max(0, (t - s0.w0) / Math.max(1e-3, s0.w1 - s0.w0)))) / FL.K;
+}
+function mosaicTick(el) {
+  const idx = slotAt(el), sl = FL.slots[idx];
+  // give a freshly switched system time to grow before keeping a moment of it
+  const settling = el - (PR.lastChange || -10) < Math.max(TR.dur + 0.4, ({ sl: 1.5, gs: 2.5, pl: 1.0 })[S.mode]);
+  if (AU.beatHit && !settling && (AU.beatStr || 0) > sl.best) { sl.best = AU.beatStr || 0; sl.pending = el + 0.15; }
+  for (let i = Math.max(0, idx - 1); i <= idx; i++) {
+    const s2 = FL.slots[i];
+    if (s2.pending > 0 && el >= s2.pending) { captureLayer(i, s2.pending - 0.15); s2.pending = -1; s2.best = Math.max(s2.best, 1e-3); }
+  }
+  // a missed moment may be filled late, but only from its own section (same system)
+  for (let i = 0; i < idx; i++) if (!FL.slots[i].done && FL.slots[i].pending < 0 && !settling && FL.slots[i].seg === sl.seg) captureLayer(i, el);
+  if (!sl.done && el > sl.w0 + 0.85 * (sl.w1 - sl.w0) && !settling && sl.pending < 0) captureLayer(idx, el);
+}
+async function finishFluid() {
+  PR.running = false; PR.ended = false; AU.playing = false;
+  stopSources(); $("prog").hidden = true; syncPlay();
+  setTrack("Portrait finished: " + AU.name, false);
+  const K = FL.K;
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, FL.tex); gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+  // how full is each kept moment?
+  const cover = new Float32Array(K), lv = Math.min(4, FL.levels - 1), lw = Math.max(1, FL.W >> lv), lh = Math.max(1, FL.H >> lv);
+  const rb = new Float32Array(lw * lh * 4), rfb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, rfb);
+  for (let k = 0; k < K; k++) {
+    try { gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, FL.tex, lv, k); gl.readPixels(0, 0, lw, lh, gl.RGBA, gl.FLOAT, rb);
+      let sm = 0; for (let i = 0; i < rb.length; i += 4) sm += rb[i]; cover[k] = sm / (lw * lh); } catch (e) { cover[k] = 0.3; }
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(rfb);
+  // one region per section, using the section's best moment: well filled but not swamped
+  const segIds = [...new Set(FL.slots.map(sl => sl.seg))];
+  let regions = segIds.map(sg => {
+    const ks = FL.slots.map((sl, k) => k).filter(k => FL.slots[k].seg === sg);
+    const best = ks.reduce((a, b) => (Math.abs(cover[b] - 0.32) < Math.abs(cover[a] - 0.32) ? b : a), ks[0]);
+    const g = PR.plan ? PR.plan[sg] : null;
+    return { k: best, seg: sg, t0: g ? g.t0 : FL.slots[ks[0]].w0, t1: g ? g.t1 : FL.slots[ks[ks.length - 1]].w1, sys: FL.slots[best].sys, preset: FL.slots[best].preset, empty: cover[best] < 0.004 };
+  });
+  if (regions.some(r => !r.empty)) regions = regions.filter(r => !r.empty);
+  regions = regions.slice(0, 24);
+  const N = regions.length, avg = regions.reduce((a, r) => a + (r.t1 - r.t0), 0) / N;
+  const wts = regions.map(r => Math.max(r.t1 - r.t0, avg * 0.6)), tot = wts.reduce((a, b) => a + b, 0);
+  let acc = 0; regions.forEach((r, i) => { r.x0 = acc / tot; acc += wts[i]; r.x1 = acc / tot; });
+  const reg = new Float32Array(24 * 4), pals = new Float32Array(144 * 3);
+  regions.forEach((r, i) => {
+    const pm = P[r.sys] || P.gs;
+    reg.set([r.x0, r.k, pm.edge, pm.soft * 0.7], i * 4);
+    pals.set(FL.pals[r.k], i * 18);
+  });
+  // paint at large size, in strips so slower graphics cards aren't overloaded
+  const maxT = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
+  const W = Math.min(3600, maxT), Hi = Math.round(W / FL.aspect);
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, Hi, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  gl.viewport(0, 0, W, Hi); gl.useProgram(progRegions.p); const u = progRegions.u;
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, FL.tex); gl.uniform1i(u.uL, 0);
+  gl.uniform2f(u.uOut, W, Hi); gl.uniform1i(u.uN, N); gl.uniform4fv(u.uReg, reg); gl.uniform3fv(u.uPals, pals); gl.uniform3fv(u.uBg, BG);
+  gl.uniform1f(u.uGrain, look.grain * 0.8); gl.uniform1f(u.uGlow, look.glow); gl.uniform1f(u.uTilt, look.tilt); gl.uniform1f(u.uRim, look.rim);
+  gl.uniform1f(u.uAmp, FL.waves); gl.uniform1f(u.uSeed, FL.seed);
+  gl.bindVertexArray(quadVao); gl.enable(gl.SCISSOR_TEST);
+  const strips = 8;
+  for (let i = 0; i < strips; i++) { const y0 = Math.floor(Hi * i / strips), y1 = Math.floor(Hi * (i + 1) / strips); gl.scissor(0, y0, W, y1 - y0); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.flush(); }
+  gl.disable(gl.SCISSOR_TEST);
+  const px = new Uint8Array(W * Hi * 4); gl.readPixels(0, 0, W, Hi, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb); gl.deleteTexture(t);
+  try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+  const band = Math.round(Hi * 0.14), pad = Math.round(Math.min(W, Hi) * 0.04), H = Hi + band;
+  const out = newCanvas(W, H), g = out.getContext("2d");
+  g.fillStyle = INK; g.fillRect(0, 0, W, H);
+  const img = g.createImageData(W, Hi), row = W * 4;
+  for (let y = 0; y < Hi; y++) img.data.set(px.subarray((Hi - 1 - y) * row, (Hi - y) * row), y * row);
+  g.putImageData(img, 0, 0);
+  // legend under the image: each region's system, preset and start time
+  const cream = "#f1e7dc", muted = "#a9988f", title = AU.name.replace(/\.[^.]+$/, "");
+  const ty = Hi + Math.round(band * 0.28), fs = Math.max(11, Math.round(Hi * 0.018));
+  g.fillStyle = "rgba(241,231,220,0.22)"; g.fillRect(0, ty, W, 2);
+  regions.forEach((r, i) => {
+    const x = Math.round(r.x0 * W) + (i === 0 ? pad : 0), xe = i === N - 1 ? W - pad : Math.round(r.x1 * W);
+    g.fillStyle = cream; g.fillRect(x - 1, ty - Math.round(fs * 0.6), 3, Math.round(fs * 1.2) + 2);
+    g.font = `500 ${fs}px "IBM Plex Mono", Consolas, monospace`; g.fillStyle = muted;
+    const room = xe - x - fs * 0.8;
+    const long = `${fmtTime(r.t0)} ${SYS_NAME[r.sys].toUpperCase()}${r.preset ? " · " + r.preset.toUpperCase() : ""}`, short = SYS_NAME[r.sys].toUpperCase();
+    const label = g.measureText(long).width <= room ? long : short;
+    if (room > fs * 3) g.fillText(label, x + Math.round(fs * 0.5), ty + Math.round(fs * 1.7), room);
+  });
+  g.fillStyle = cream; g.font = `700 ${Math.round(Hi * 0.05)}px "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif`;
+  g.fillText(title, pad, H - Math.round(band * 0.18), W * 0.62);
+  g.fillStyle = muted; g.font = `500 ${fs}px "IBM Plex Mono", Consolas, monospace`; g.textAlign = "right";
+  g.fillText(`EMERGENCE STUDIES  ·  ${fmtTime(PR.dur)}`, W - pad, H - Math.round(band * 0.18)); g.textAlign = "left";
+  out.toBlob(blob => {
+    if (!blob) return;
+    if (PR.url) URL.revokeObjectURL(PR.url);
+    PR.blob = blob; PR.url = URL.createObjectURL(blob); PR.title = title;
+    $("resimg").src = PR.url; $("resnote").textContent = `${W} × ${H} px PNG · ${N} section${N === 1 ? "" : "s"}`; $("result").hidden = false; $("ressave").focus();
+  }, "image/png");
+}
+function restoreAfterPortrait() {
+  if (!PR.saved) return;
+  applySettings(PR.saved); PR.saved = null; syncAllUI(); sizeCanvas(); setupMode();
+}
+
+function startPortrait() {
+  if (!AU.buf || !ensureCtx()) return;
+  stopSources();
+  $("result").hidden = true;
+  PR.saved = getSettings();
+  setPanel(false); updateBox();
+  PR.running = true; if (sizeCanvas()) setupMode();
+  seed(); IMP.length = 0; toss[0] = toss[1] = 0;
+  PR.running = true; PR.ended = false; PR.cells = []; PR.sections = [0]; PR.dur = AU.buf.duration; PR.mode = S.mode;
+  PR.timeline = [{ t: 0, sys: S.mode, preset: (MODES[S.mode].presets[S.preset[S.mode]] || { name: "Custom" }).name }];
+  AD.beats = []; PR.lastChange = -10; PR.nextSeg = 1; PR.plan = null;
+  Object.assign(NOV, { mean: 0.02, init: false, last: 0 });
+  if (AD.on) {
+    try { PR.plan = analyzeSong(AU.buf); } catch (e) { PR.plan = null; }
+    if (PR.plan && PR.plan.length) {
+      PR.timeline = []; PR.sections = PR.plan.map(g => g.t0);
+      applyStyle(0, PR.plan[0].sys, PR.plan[0].preset);
+    }
+  }
+  if (PR.style === "fluid") fluidInit();
+  const src = AU.ctx.createBufferSource(); src.buffer = AU.buf; src.loop = false; src.connect(AU.out);
+  src.onended = () => { if (AU.src === src) { AU.src = null; if (PR.running) PR.ended = true; } };
+  AU.src = src; AU.mode = "song"; AU.ctx.resume(); src.start(); PR.start = AU.ctx.currentTime; AU.playing = true;
+  setTrack("Making a song portrait of " + AU.name, true); syncPlay();
+  $("prog").hidden = false;
+}
+function cancelPortrait() {
+  PR.running = false; PR.ended = false; PR.cells = [];
+  stopSources(); AU.playing = false; $("prog").hidden = true;
+  setTrack("Portrait cancelled. " + AU.name + " is still loaded.", false); syncPlay();
+  restoreAfterPortrait();
+}
+function portraitTick(dt) {
+  if (!PR.running) return;
+  const el = Math.min(PR.dur, AU.ctx.currentTime - PR.start), win = PR.dur / PR.frames;
+  if (AU.beatHit) { AD.beats.push(el); if (AD.beats.length > 64) AD.beats.shift(); }
+  // planned system changes from the song analysis
+  while (AD.on && PR.plan && PR.nextSeg < PR.plan.length && el >= PR.plan[PR.nextSeg].t0) {
+    const g = PR.plan[PR.nextSeg++]; applyStyle(g.t0, g.sys, g.preset);
+  }
+  if (PR.style === "fluid") {
+    mosaicTick(el);
+  } else {
+    const idx = Math.min(PR.frames - 1, Math.floor(el / win));
+    for (let i = 0; i <= idx; i++) if (!PR.cells[i]) PR.cells[i] = makeCell(i);
+    const c = PR.cells[idx];
+    if (el - c.lastSample >= SAMPLE_DT) sampleTrail(c, el);
+    if (AU.beatHit && (AU.beatStr || 0) > c.best) { c.best = AU.beatStr || 0; c.pending = el + 0.15; }
+    for (let i = Math.max(0, idx - 1); i <= idx; i++) {
+      const ci = PR.cells[i];
+      if (ci.pending > 0 && el >= ci.pending) { snapPeak(ci, ci.pending - 0.15); ci.pending = -1; }
+    }
+    if (idx > 0) { const pv = PR.cells[idx - 1]; if (!pv.peak && pv.pending < 0) snapPeak(pv, idx * win); }
+  }
+  if (!PR.plan) noveltyUpdate(dt, el);
+  const nowSys = PR.timeline.length ? PR.timeline[PR.timeline.length - 1] : null;
+  $("progtext").textContent = `Song portrait · ${fmtTime(el)} / ${fmtTime(PR.dur)} · section ${secLetter(Math.max(0, PR.sections.filter(t0 => t0 <= el).length - 1))}` + (nowSys ? ` · ${SYS_NAME[nowSys.sys]}, ${nowSys.preset}` : "");
+  $("pbarfill").style.width = (100 * el / PR.dur).toFixed(1) + "%";
+  $("steerE").style.width = (SG.E * 100).toFixed(0) + "%"; $("steerC").style.width = (SG.C * 100).toFixed(0) + "%";
+  { const st = []; for (let i = 0; i < 6; i++) st.push(`rgb(${palFlat.slice(i * 3, i * 3 + 3).map(v => Math.round(v * 255)).join(",")})`); $("swatch").style.background = `linear-gradient(90deg, ${st.join(", ")})`; }
+  if (PR.ended || el >= PR.dur - 0.03) {
+    if (PR.style === "fluid") {
+      for (let k = 0; k < FL.K; k++) if (!FL.slots[k].done) captureLayer(k, Math.min(PR.dur, FL.slots[k].w1));
+      finishFluid();
+    }
+    else {
+      for (let i = 0; i < PR.frames; i++) {
+        if (!PR.cells[i]) PR.cells[i] = makeCell(i);
+        const ci = PR.cells[i]; if (!ci.peak) snapPeak(ci, Math.min(PR.dur, (i + 1) * win));
+      }
+      finishPortrait();
+    }
+    restoreAfterPortrait();
+  }
+}
+async function finishPortrait() {
+  PR.running = false; PR.ended = false; AU.playing = false;
+  stopSources(); $("prog").hidden = true; syncPlay();
+  setTrack("Portrait finished: " + AU.name, false);
+  try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+  const cells = PR.cells.filter(Boolean), n = cells.length; if (!n) return;
+  const win = PR.dur / PR.frames;
+  // tile = faded long exposure underneath, crisp peak snapshot on top
+  const tiles = cells.map(c => {
+    const t = newCanvas(c.acc.width, c.acc.height), g = t.getContext("2d");
+    g.fillStyle = INK; g.fillRect(0, 0, t.width, t.height);
+    g.globalAlpha = 0.62; g.drawImage(c.acc, 0, 0); g.globalAlpha = 1;
+    g.globalCompositeOperation = "lighten"; g.drawImage(c.peak, 0, 0); g.globalCompositeOperation = "source-over";
+    return { c: t, t: c.peakT, mid: (c.i + 0.5) * win };
+  });
+  const secOf = tm => { let k = 0; for (let j = 0; j < PR.sections.length; j++) if (PR.sections[j] <= tm) k = j; return k; };
+  const a = tiles[0].c.width / tiles[0].c.height;
+  let cols = 4, best = 1e9;
+  for (let c = 2; c <= 8; c++) { const r = Math.ceil(n / c), score = Math.abs((c * a) / r - 1.0) + (n % c ? 0.25 : 0); if (score < best) { best = score; cols = c; } }
+  // rows: a new section always starts a new row
+  const rows = [];
+  tiles.forEach((tl, i) => {
+    const sec = secOf(tl.mid), last = rows[rows.length - 1];
+    if (!last || last.sec !== sec || last.items.length >= cols) rows.push({ sec, starts: !last || last.sec !== sec, items: [], idx0: i });
+    rows[rows.length - 1].items.push(tl);
+  });
+  const nSec = rows.filter(r => r.starts).length;
+  const cw = 560, ch = Math.round(cw / a), gap = Math.round(cw * 0.07), secGap = Math.round(gap * 2.4), mx = Math.round(cw * 0.32);
+  const lw = Math.round(cw * 0.26), head = Math.round(cw * 0.46), lab = Math.round(cw * 0.1), foot = Math.round(cw * 0.22);
+  const rowH = ch + lab;
+  let gridH = 0; rows.forEach((r, k) => { gridH += rowH + (k < rows.length - 1 ? (rows[k + 1].starts ? secGap : gap) : 0); });
+  const W = mx * 2 + lw + cols * cw + (cols - 1) * gap, H = mx + head + gridH + foot + Math.round(mx * 0.5);
+  const out = newCanvas(W, H), g = out.getContext("2d");
+  g.fillStyle = INK; g.fillRect(0, 0, W, H);
+  const cream = "#f1e7dc", muted = "#a9988f", title = AU.name.replace(/\.[^.]+$/, "");
+  g.fillStyle = cream; g.textBaseline = "alphabetic";
+  g.font = `700 ${Math.round(cw * 0.17)}px "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif`;
+  g.fillText(title, mx, mx + Math.round(cw * 0.2), W - mx * 2);
+  g.fillStyle = muted; g.font = `500 ${Math.round(cw * 0.042)}px "IBM Plex Mono", Consolas, monospace`;
+  const usedSys = [...new Set((PR.timeline.length ? PR.timeline : [{ sys: PR.mode }]).map(x => x.sys))];
+  const sysName = usedSys.map(m => ({ sl: "SmoothLife", gs: "Reaction-diffusion", pl: "Particle life" })[m]).join(" + ");
+  g.fillText(`EMERGENCE STUDIES  ·  ${sysName.toUpperCase()}  ·  ${n} MOMENTS  ·  ${nSec} SECTION${nSec === 1 ? "" : "S"}  ·  ${fmtTime(PR.dur)}`, mx, mx + Math.round(cw * 0.32));
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+  let y = mx + head, secTop = y;
+  rows.forEach((r, k) => {
+    if (r.starts) {
+      secTop = y;
+      const st = PR.sections[r.sec] || 0;
+      g.fillStyle = cream; g.font = `700 ${Math.round(cw * 0.13)}px "Bricolage Grotesque", "Avenir Next", sans-serif`;
+      g.fillText(secLetter(r.sec), mx, y + Math.round(cw * 0.12));
+      g.fillStyle = muted; g.font = `400 ${Math.round(cw * 0.038)}px "IBM Plex Mono", Consolas, monospace`;
+      g.fillText(fmtTime(st), mx, y + Math.round(cw * 0.19));
+    }
+    r.items.forEach((tl, j) => {
+      const cx = mx + lw + j * (cw + gap), num = r.idx0 + j + 1;
+      g.drawImage(tl.c, cx, y, cw, ch);
+      g.strokeStyle = "rgba(241,231,220,0.22)"; g.lineWidth = 2; g.strokeRect(cx + 1, y + 1, cw - 2, ch - 2);
+      g.fillStyle = muted; g.font = `400 ${Math.round(cw * 0.04)}px "IBM Plex Mono", Consolas, monospace`;
+      g.textAlign = "left"; g.fillText(fmtTime(tl.t), cx, y + ch + Math.round(lab * 0.68));
+      g.textAlign = "right"; g.fillText(String(num).padStart(2, "0"), cx + cw, y + ch + Math.round(lab * 0.68));
+      g.textAlign = "left";
+    });
+    const endsSection = k === rows.length - 1 || rows[k + 1].starts;
+    if (endsSection) { // thin rule marking the section's span
+      g.fillStyle = "rgba(241,231,220,0.28)"; g.fillRect(mx + 2, secTop + Math.round(cw * 0.24), 2, Math.max(0, y + ch - secTop - Math.round(cw * 0.24)));
+    }
+    y += rowH + (k < rows.length - 1 ? (rows[k + 1].starts ? secGap : gap) : 0);
+  });
+  // film grain over the whole sheet
+  const tile = newCanvas(256, 256), tg = tile.getContext("2d"), id = tg.createImageData(256, 256);
+  for (let i = 0; i < id.data.length; i += 4) { const v = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 20; }
+  tg.putImageData(id, 0, 0); g.fillStyle = g.createPattern(tile, "repeat"); g.fillRect(0, 0, W, H);
+  out.toBlob(blob => {
+    if (!blob) return;
+    if (PR.url) URL.revokeObjectURL(PR.url);
+    PR.blob = blob; PR.url = URL.createObjectURL(blob); PR.title = title;
+    $("resimg").src = PR.url; $("resnote").textContent = `${W} × ${H} px PNG · ${nSec} section${nSec === 1 ? "" : "s"} found`; $("result").hidden = false; $("ressave").focus();
+  }, "image/png");
+}
+async function savePortrait() {
+  if (!PR.blob) return;
+  const note = $("resnote");
+  let dl = null;
+  try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { dl = null; }
+  if (!dl) {
+    // outside Claude (for example on GitHub Pages): a normal browser download
+    try {
+      const name = (PR.title || "song").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 120) || "song";
+      const link = document.createElement("a"); link.href = PR.url; link.download = name + " - song portrait.png";
+      document.body.appendChild(link); link.click(); link.remove();
+      note.textContent = "Downloaded.";
+    } catch (e) { note.textContent = "Right-click the image and choose Save image as."; }
+    return;
+  }
+  try {
+    const name = (PR.title || "song").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 120) || "song";
+    await dl.save({ filename: name + " - song portrait.png", data: PR.blob });
+    note.textContent = "Saved.";
+  } catch (e) {
+    if (e && e.code === "declined") return;
+    if (e && e.code === "rate_limited") { note.textContent = "A save prompt is already open."; return; }
+    note.textContent = "Couldn't save the image here. Right-click it and choose Save image as.";
+  }
+}
+
+let lastAlive = 0, fpsT = 0, fpsN = 0, lastT = 0;
+const fpsEl = document.getElementById("fps");
+function frame(ms) {
+  const time = ms * 0.001, dt = Math.min(0.05, Math.max(0, time - lastT)); lastT = time;
+  audioUpdate();
+  motionUpdate(dt);
+  steerUpdate(dt);
+  steerScale(time);
+  if (!S.paused) {
+    if (S.mode === "sl") {
+      stepSL(time);
+      if (AU.beatNow) slDrop(1 + Math.round(music.react * 1.5));
+      if (P.sl.alive && time - lastAlive > (AU.playing ? 2.5 : 5)) { lastAlive = time; slDrop(3); }
+      slLifeCheck(time);
+    } else if (S.mode === "gs") stepGS();
+    else plStep();
+  }
+  if ((fpsN & 15) === 0) updateBox();
+  if (S.mode === "pl") plRender();
+  render(time);
+  portraitTick(dt);
+  drawMeter();
+  fpsN++; if (ms - fpsT > 1000) { fpsEl.textContent = fpsN + " fps"; fpsN = 0; fpsT = ms; }
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- pointer ---------------- */
+function setPtr(e) {
+  const r = canvas.getBoundingClientRect();
+  ptr.x = (e.clientX - r.left) / r.width; ptr.y = 1 - (e.clientY - r.top) / r.height; ptr.shift = e.shiftKey;
+}
+canvas.addEventListener("pointerdown", e => { ptr.down = true; ptr.right = e.button === 2; setPtr(e); canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener("pointermove", e => { setPtr(e); });
+const up = () => { ptr.down = false; ptr.right = false; };
+canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+/* ---------------- UI ---------------- */
+const $ = id => document.getElementById(id);
+function decimals(step) { const s = String(step); return s.includes(".") ? s.split(".")[1].length : 0; }
+const ALLCTL = [];
+function slider(p, obj, onChange, prefix) {
+  const wrap = document.createElement("div"); wrap.className = "ctl";
+  const id = prefix + "-" + p.id;
+  wrap.innerHTML = `<label for="${id}"><span>${p.label}</span><output id="${id}-o"></output></label><input type="range" id="${id}" min="${p.min}" max="${p.max}" step="${p.step}">`;
+  const input = wrap.querySelector("input"), out = wrap.querySelector("output");
+  const show = () => out.textContent = Number(obj[p.id]).toFixed(decimals(p.step));
+  input.value = obj[p.id]; show();
+  input.addEventListener("input", () => { obj[p.id] = parseFloat(input.value); show(); onChange && onChange(p); });
+  wrap._sync = () => { input.value = obj[p.id]; show(); };
+  ALLCTL.push(wrap);
+  return wrap;
+}
+
+const tabsEl = $("tabs");
+for (const m in MODES) {
+  const b = document.createElement("button"); b.setAttribute("role", "tab"); b.dataset.mode = m;
+  b.innerHTML = `<span class="k">${MODES[m].key}</span>${MODES[m].tab}`;
+  b.addEventListener("click", () => switchMode(m));
+  tabsEl.appendChild(b);
+}
+LOOK.forEach(p => $("look").appendChild(slider(p, look, null, "look")));
+PALETTES.forEach((p, i) => {
+  const b = document.createElement("button"); b.className = "pal"; b.title = p.name; b.setAttribute("aria-label", "Palette: " + p.name);
+  b.style.background = `linear-gradient(90deg, ${p.stops.join(", ")})`;
+  b.addEventListener("click", () => { S.pal = i; applyPalette(); syncPals(); });
+  $("pals").appendChild(b);
+});
+function syncPals() { [...$("pals").children].forEach((b, i) => b.setAttribute("aria-pressed", i === S.pal)); $("palname").textContent = PALETTES[S.pal].name; }
+
+let ruleCtls = [];
+function buildModeUI() {
+  const M = MODES[S.mode], mp = P[S.mode];
+  [...tabsEl.children].forEach(b => b.setAttribute("aria-selected", b.dataset.mode === S.mode));
+  $("blurb").textContent = M.blurb;
+  $("hint").textContent = M.hint;
+  const pr = $("presets"); pr.innerHTML = "";
+  M.presets.forEach((p, i) => {
+    const b = document.createElement("button"); b.className = "chip"; b.textContent = p.name;
+    b.setAttribute("aria-pressed", S.preset[S.mode] === i);
+    b.addEventListener("click", () => applyPreset(i));
+    pr.appendChild(b);
+  });
+  const rules = $("rules"); rules.innerHTML = ""; ruleCtls = [];
+  M.params.forEach(p => {
+    const el = slider(p, mp, onParam, S.mode); ruleCtls.push(el); rules.appendChild(el);
+  });
+  M.toggles.forEach(t => {
+    const lab = document.createElement("label"); lab.className = "toggle";
+    lab.innerHTML = `<input type="checkbox" id="${S.mode}-${t.id}"> <span>${t.label}</span>`;
+    const cb = lab.querySelector("input"); cb.checked = mp[t.id];
+    cb.addEventListener("change", () => mp[t.id] = cb.checked);
+    rules.appendChild(lab);
+  });
+  const br = $("brush"); br.innerHTML = "";
+  M.brush.forEach((name, i) => {
+    const b = document.createElement("button"); b.textContent = name; b.setAttribute("aria-pressed", S.flip === (i === 1));
+    b.addEventListener("click", () => { S.flip = i === 1; buildModeUI(); });
+    br.appendChild(b);
+  });
+}
+function onParam(p) {
+  if (p.rebuild) { clearTimeout(rebuildTimer); rebuildTimer = setTimeout(setupMode, 150); }
+  if (p.reinit) plInit(true);
+  if (S.preset[S.mode] !== -1 && S.mode !== "pl" && ["b1","b2","d1","d2","f","k"].includes(p.id)) { S.preset[S.mode] = -1; [...$("presets").children].forEach(b => b.setAttribute("aria-pressed", false)); }
+}
+function applyPreset(i) {
+  const p = MODES[S.mode].presets[i];
+  if (p.action) { plRules(p.action); }
+  else { Object.assign(P[S.mode], p.v); ruleCtls.forEach(c => c._sync()); }
+  S.preset[S.mode] = p.action ? -1 : i;
+  [...$("presets").children].forEach((b, j) => b.setAttribute("aria-pressed", S.preset[S.mode] === j));
+}
+function switchMode(m) {
+  if (m === S.mode) return;
+  if (PR.running) cancelPortrait();
+  S.mode = m; S.flip = false; buildModeUI(); setupMode();
+}
+function setPaused(v) { S.paused = v; $("pause").textContent = v ? "Play" : "Pause"; }
+function clearSim() {
+  if (S.mode === "sl") upload(ping[0], new Float32Array(ping[0].w * ping[0].h * 4));
+  else if (S.mode === "gs") { const t = ping[0], d = new Float32Array(t.w * t.h * 4); for (let i = 0; i < t.w * t.h; i++) { d[i * 4] = 1; d[i * 4 + 3] = 1; } upload(t, d); }
+  else { updateBox(); PL.VX.fill(0); PL.VY.fill(0); for (let i = 0; i < PL.n; i++) { PL.X[i] = rand(BOX.x0, BOX.x1) * aspect; PL.Y[i] = rand(BOX.y0, BOX.y1); } }
+}
+$("reseed").addEventListener("click", seed);
+$("song").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (f) playSong(f); e.target.value = ""; });
+$("songlabel").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("song").click(); } });
+$("demo").addEventListener("click", () => { if (PR.running) cancelPortrait(); startDemo(); });
+$("portrait").addEventListener("click", startPortrait);
+$("progcancel").addEventListener("click", cancelPortrait);
+$("ressave").addEventListener("click", savePortrait);
+$("resclose").addEventListener("click", () => { $("result").hidden = true; setPanel(true); });
+const PNOTES = {
+  fluid: "Plays the loaded song once. Each section of the song becomes a region of one image, showing the system it played. Time runs left to right.",
+  grid: "Plays the loaded song once and lays out a grid of moments, one row per section of the song."
+};
+function syncPortraitUI() {
+  [...$("pstyle").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.style === PR.style));
+  $("pnote").textContent = PNOTES[PR.style];
+  $("fluidctl").hidden = PR.style !== "fluid";
+}
+[["fluid", "Fluid image"], ["grid", "Grid of moments"]].forEach(([k, label]) => {
+  const b = document.createElement("button"); b.className = "chip"; b.textContent = label; b.dataset.style = k;
+  b.addEventListener("click", () => { if (PR.running) return; PR.style = k; syncPortraitUI(); });
+  $("pstyle").appendChild(b);
+});
+$("autodir").addEventListener("change", e => AD.on = e.target.checked);
+$("fluidctl").appendChild(slider({ id: "waves", label: "Border waviness", min: 0, max: 3, step: 0.05, val: 1 }, FL, null, "fluid"));
+syncPortraitUI();
+[12, 16, 24].forEach(nf => {
+  const b = document.createElement("button"); b.className = "chip"; b.textContent = nf + " moments";
+  b.setAttribute("aria-pressed", PR.frames === nf);
+  b.addEventListener("click", () => { PR.frames = nf; [...$("framechips").children].forEach(x => x.setAttribute("aria-pressed", x === b)); });
+  $("framechips").appendChild(b);
+});
+$("play").addEventListener("click", toggleMusic);
+$("musicctl").appendChild(slider({ id: "sens", label: "Beat sensitivity", min: 0, max: 1, step: 0.05, val: 0.5 }, music, null, "music"));
+$("musicctl").appendChild(slider({ id: "push", label: "Beat push", min: 0, max: 3, step: 0.05, val: 1 }, music, null, "music"));
+$("musicctl").appendChild(slider({ id: "react", label: "Speed & glow response", min: 0, max: 2, step: 0.05, val: 1 }, music, null, "music"));
+{
+  const lab = document.createElement("label"); lab.className = "toggle";
+  lab.innerHTML = `<input type="checkbox" id="music-steer" checked> <span>Song steers feed rate, color and pattern scale</span>`;
+  lab.querySelector("input").addEventListener("change", e => SG.on = e.target.checked);
+  $("musicctl").appendChild(lab);
+  $("musicctl").appendChild(slider({ id: "soft", label: "Steering in soft parts", min: 0, max: 2, step: 0.05, val: 0.4 }, SG, null, "steer"));
+  $("musicctl").appendChild(slider({ id: "full", label: "Steering in full parts", min: 0, max: 2, step: 0.05, val: 1.5 }, SG, null, "steer"));
+  $("musicctl").appendChild(slider({ id: "hue", label: "Hue shift with sound (degrees)", min: 0, max: 180, step: 5, val: 90 }, SG, null, "steer"));
+}
+{
+  const lab = document.createElement("label"); lab.className = "toggle";
+  lab.innerHTML = `<input type="checkbox" id="music-beats" checked> <span>Beats drop new life</span>`;
+  lab.querySelector("input").addEventListener("change", e => music.beats = e.target.checked);
+  $("musicctl").appendChild(lab);
+}
+$("pause").addEventListener("click", () => setPaused(!S.paused));
+$("clear").addEventListener("click", clearSim);
+function setPanel(show) { $("panel").hidden = !show; $("show").hidden = show; updateBox(); }
+$("hide").addEventListener("click", () => setPanel(false));
+$("show").addEventListener("click", () => setPanel(true));
+window.addEventListener("keydown", e => {
+  if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
+  if (e.key === "Shift") ptr.shift = true;
+  if (e.key === "1") switchMode("sl"); else if (e.key === "2") switchMode("gs"); else if (e.key === "3") switchMode("pl");
+  else if (e.key === "r" || e.key === "R") seed();
+  else if (e.key === "c" || e.key === "C") clearSim();
+  else if (e.key === "h" || e.key === "H") setPanel($("panel").hidden);
+  else if (e.key === " ") { e.preventDefault(); setPaused(!S.paused); }
+  else if (e.key === "m" || e.key === "M") toggleMusic();
+});
+window.addEventListener("keyup", e => { if (e.key === "Shift") ptr.shift = false; });
+
+/* ---------------- boot ---------------- */
+/* ---------------- defaults ---------------- */
+// Settings baked into the page itself (filled in by Claude from "Copy settings"); null = built-in values.
+const BAKED_DEFAULTS = null;
+const STORE_KEY = "emergence-studies-defaults";
+function getSettings() {
+  return { v: 1, mode: S.mode, pal: S.pal, P: JSON.parse(JSON.stringify(P)), look: { ...look },
+    music: { ...music }, steer: { on: SG.on, soft: SG.soft, full: SG.full, hue: SG.hue }, frames: PR.frames };
+}
+function applySettings(o) {
+  if (!o || typeof o !== "object") return;
+  const num = (dst, src) => { if (!src) return; for (const k in dst) if (k in src && typeof src[k] === typeof dst[k]) dst[k] = src[k]; };
+  if (o.P) for (const m in P) num(P[m], o.P[m]);
+  num(look, o.look); num(music, o.music);
+  if (o.steer) num(SG, o.steer);
+  if (MODES[o.mode]) S.mode = o.mode;
+  if (Number.isInteger(o.pal) && PALETTES[o.pal]) S.pal = o.pal;
+  if ([12, 16, 24].includes(o.frames)) PR.frames = o.frames;
+}
+function syncAllUI() {
+  applyPalette(); syncPals(); buildModeUI();
+  ALLCTL.forEach(c => c._sync && c._sync());
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.checked = v; };
+  set("music-beats", music.beats); set("music-steer", SG.on);
+  [...$("framechips").children].forEach(b => b.setAttribute("aria-pressed", b.textContent.startsWith(PR.frames + " ")));
+}
+const BUILTIN = getSettings();
+applySettings(BAKED_DEFAULTS);
+try { const raw = localStorage.getItem(STORE_KEY); if (raw) applySettings(JSON.parse(raw)); } catch (e) {}
+$("savedef").addEventListener("click", () => {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(getSettings())); $("defnote").textContent = "Saved. The page will open with these settings in this browser."; }
+  catch (e) { $("defnote").textContent = "This browser blocked saving. Use Copy settings and paste them to Claude instead."; }
+});
+$("copydef").addEventListener("click", () => {
+  const txt = JSON.stringify(getSettings()), box = $("defbox");
+  box.value = txt;
+  const done = () => { $("defnote").textContent = "Copied. Paste it into the chat with Claude to make these the built-in defaults."; };
+  const fallback = () => { box.hidden = false; box.focus(); box.select(); $("defnote").textContent = "Select the text below, copy it, and paste it into the chat with Claude."; };
+  try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (e) { fallback(); }
+});
+$("resetdef").addEventListener("click", () => {
+  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  applySettings(BUILTIN); applySettings(BAKED_DEFAULTS);
+  syncAllUI(); setupMode();
+  $("defnote").textContent = "Back to the original settings.";
+});
+
+syncAllUI();
+sizeCanvas(); setupMode();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
