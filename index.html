@@ -78,6 +78,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; height:
 .btn:disabled { opacity: .4; cursor: default; }
 .track { color: var(--muted); margin: 9px 0 8px; line-height: 1.5; overflow-wrap: anywhere; }
 .track.on { color: var(--text); }
+.scrub { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.scrub[hidden] { display: none !important; }
+.scrub label { display: flex; justify-content: space-between; gap: 8px; }
+.scrub output { color: var(--muted); font-variant-numeric: tabular-nums; }
 #meter { display: block; width: 100%; height: 30px; margin-bottom: 12px; }
 .portrait { display: flex; flex-direction: column; gap: 9px; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
 .portrait h2 { margin: 0; }
@@ -94,6 +98,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; height:
 #result { position: fixed; inset: 0; background: rgba(12, 10, 11, 0.86); display: grid; place-items: center; padding: 24px 16px; }
 #result[hidden] { display: none !important; }
 .btn.rec { width: 100%; margin-bottom: 12px; }
+.reclen { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.reclen .chips { gap: 5px; }
+.reclen .chip { padding: 4px 9px; }
 .btn.rec.on { background: #c8323c; border-color: #c8323c; color: #fff; }
 #recbadge { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-variant-numeric: tabular-nums; }
 #recbadge i { width: 9px; height: 9px; border-radius: 50%; background: #e0414b; animation: recblink 1s steps(2) infinite; }
@@ -166,8 +173,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
       <button class="btn" id="play" disabled>Play</button>
     </div>
     <p class="track" id="track">No music yet. Load an audio file from your computer (MP3, WAV, M4A), or try the demo beat.</p>
+    <div class="scrub" id="scrub" hidden>
+      <label for="songpos"><span>Song position</span><output id="songtime">0:00 / 0:00</output></label>
+      <input type="range" id="songpos" min="0" max="1" step="0.1" value="0">
+    </div>
     <canvas id="meter" aria-hidden="true"></canvas>
-    <button class="btn rec" id="recbtn">● Record clip (10 s max)</button>
+    <div class="reclen"><span>Clip length</span><div class="chips" id="reclen"></div></div>
+    <button class="btn rec" id="recbtn">● Record clip (10 s)</button>
     <div id="musicctl"></div>
     <div class="portrait">
       <h2>Song portrait</h2>
@@ -1111,10 +1123,35 @@ async function playSong(file) {
     setTrack("Couldn't read that file as audio. Try an MP3, WAV or M4A.");
   }
 }
-function startSong() {
-  const src = AU.ctx.createBufferSource(); src.buffer = AU.buf; src.loop = true; src.connect(AU.out); src.start();
-  AU.src = src; AU.ctx.resume(); AU.playing = true;
+function startSong(offset = 0, keepPaused = false) {
+  const src = AU.ctx.createBufferSource(); src.buffer = AU.buf; src.loop = true; src.connect(AU.out);
+  offset = Math.min(Math.max(0, offset), Math.max(0, AU.buf.duration - 0.05));
+  src.start(0, offset);
+  AU.src = src; AU.offset = offset; AU.srcStart = AU.ctx.currentTime;
+  if (keepPaused) return;
+  AU.ctx.resume(); AU.playing = true;
   setTrack("Playing: " + AU.name, true); syncPlay();
+}
+// where we are in the loaded song (it loops), in seconds
+function songPos() {
+  if (AU.mode !== "song" || !AU.buf || !AU.src) return 0;
+  const d = AU.buf.duration; return ((AU.offset || 0) + (AU.ctx.currentTime - (AU.srcStart || 0))) % d;
+}
+function seekSong(t) {
+  if (AU.mode !== "song" || !AU.buf || PR.running) return;
+  const wasPlaying = AU.playing;
+  stopSources(); AU.mode = "song";
+  startSong(t, !wasPlaying);
+}
+let scrubbing = false;
+function syncScrub() {
+  const show = AU.mode === "song" && !!AU.buf && !PR.running;
+  $("scrub").hidden = !show; if (!show) return;
+  const d = AU.buf.duration, el = $("songpos");
+  if (el.max !== String(d)) el.max = d;
+  const pos = scrubbing ? parseFloat(el.value) : songPos();
+  if (!scrubbing) el.value = pos;
+  $("songtime").textContent = `${fmtTime(pos)} / ${fmtTime(d)}`;
 }
 // A small synthesized beat (120 BPM) so the reaction can be tried without a file.
 function startDemo() {
@@ -1159,7 +1196,7 @@ function startDemo() {
 }
 function toggleMusic() {
   if (!AU.mode) return;
-  if (AU.mode === "song" && !AU.src && !PR.running) { startSong(); return; }
+  if (AU.mode === "song" && !AU.src && !PR.running) { startSong(parseFloat($("songpos").value) || 0); return; }
   if (AU.playing) { AU.ctx.suspend(); AU.playing = false; setTrack("Paused: " + AU.name, false); }
   else { AU.ctx.resume(); AU.playing = true; setTrack("Playing: " + AU.name, true); }
   syncPlay();
@@ -1879,7 +1916,8 @@ function pickClipType() {
 function syncRecBtn() {
   const b = $("recbtn"), on = !!(REC.mr && REC.mr.state === "recording");
   b.classList.toggle("on", on);
-  b.textContent = on ? `■ Stop recording · ${Math.max(0, REC.max - (performance.now() - REC.t0) / 1000).toFixed(1)} s left` : "● Record clip (10 s max)";
+  b.textContent = on ? `■ Stop recording · ${Math.max(0, REC.max - (performance.now() - REC.t0) / 1000).toFixed(1)} s left` : `● Record clip (${REC.max} s)`;
+  [...$("reclen").children].forEach(c => { c.disabled = on; c.setAttribute("aria-pressed", Number(c.dataset.s) === REC.max); });
 }
 function startClip() {
   if (!window.MediaRecorder || !canvas.captureStream) { setTrack("This browser can't record video from the page. Try a recent Chrome, Edge or Firefox."); return; }
@@ -1979,6 +2017,7 @@ function frame(ms) {
   render(time);
   portraitTick(dt);
   drawMeter();
+  syncScrub();
   fpsN++; if (ms - fpsT > 1000) { fpsEl.textContent = fpsN + " fps"; fpsN = 0; fpsT = ms; }
   requestAnimationFrame(frame);
 }
@@ -2089,6 +2128,16 @@ $("portrait").addEventListener("click", startPortrait);
 $("progcancel").addEventListener("click", cancelPortrait);
 $("ressave").addEventListener("click", savePortrait);
 $("recbtn").addEventListener("click", toggleClip);
+[10, 15, 30, 45].forEach(sec => {
+  const c = document.createElement("button"); c.className = "chip"; c.textContent = sec + " s"; c.dataset.s = sec;
+  c.addEventListener("click", () => { if (REC.mr && REC.mr.state === "recording") return; REC.max = sec; syncRecBtn(); });
+  $("reclen").appendChild(c);
+});
+syncRecBtn();
+// song position: drag to preview the time, release to jump there
+$("songpos").addEventListener("input", () => { scrubbing = true; });
+$("songpos").addEventListener("change", e => { scrubbing = false; seekSong(parseFloat(e.target.value)); });
+$("songpos").addEventListener("blur", () => { scrubbing = false; });
 $("clipclose").addEventListener("click", () => { $("clip").hidden = true; $("clipvid").pause(); });
 $("clipsave").addEventListener("click", () => {
   if (!REC.blob) return;
@@ -2163,7 +2212,7 @@ const BAKED_DEFAULTS = null;
 const STORE_KEY = "emergence-studies-defaults";
 function getSettings() {
   return { v: 1, mode: S.mode, pal: S.pal, P: JSON.parse(JSON.stringify(P)), look: { ...look },
-    music: { ...music }, steer: { on: SG.on, soft: SG.soft, full: SG.full, hue: SG.hue }, frames: PR.frames };
+    music: { ...music }, steer: { on: SG.on, soft: SG.soft, full: SG.full, hue: SG.hue }, frames: PR.frames, recMax: REC.max };
 }
 function applySettings(o) {
   if (!o || typeof o !== "object") return;
@@ -2174,12 +2223,13 @@ function applySettings(o) {
   if (MODES[o.mode]) S.mode = o.mode;
   if (Number.isInteger(o.pal) && PALETTES[o.pal]) S.pal = o.pal;
   if ([12, 16, 24].includes(o.frames)) PR.frames = o.frames;
+  if ([10, 15, 30, 45].includes(o.recMax)) REC.max = o.recMax;
 }
 function syncAllUI() {
   applyPalette(); syncPals(); buildModeUI();
   ALLCTL.forEach(c => c._sync && c._sync());
   const set = (id, v) => { const e = document.getElementById(id); if (e) e.checked = v; };
-  set("music-beats", music.beats); set("music-steer", SG.on);
+  set("music-beats", music.beats); set("music-steer", SG.on); syncRecBtn();
   [...$("framechips").children].forEach(b => b.setAttribute("aria-pressed", b.textContent.startsWith(PR.frames + " ")));
 }
 const BUILTIN = getSettings();
