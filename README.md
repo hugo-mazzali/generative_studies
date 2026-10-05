@@ -22,6 +22,10 @@ All three share one renderer: a heat-map palette, film grain, glow and rim light
 - **Beats push the shapes around**: each beat sends a shockwave from a random point that shoves and spins nearby shapes. **Beat sensitivity** and **Beat push** tune how much the music moves things.
 - **The song steers the rules**: brightness (treble vs bass) moves the feed rate and blends the colors, and loudness changes pattern scale and hue. Steering is gentle in soft passages and strong in full ones.
 
+## Record a clip
+
+Click **Record clip** (or press `V`) to record up to 10 seconds of the animation together with the music, without the control panel. Clips save as MP4 (H.264) where the browser supports it, otherwise WebM.
+
 ## Song portrait
 
 Load a song and choose **Make song portrait**. The page:
@@ -42,6 +46,7 @@ A **Grid of moments** style is also available.
 | `C` | Clear |
 | `Space` | Pause |
 | `M` | Music on/off |
+| `V` | Record a clip (up to 10 s) |
 | `H` | Hide the control panel |
 | Drag | Seed / push (hold `Shift` to erase / pull) |
 

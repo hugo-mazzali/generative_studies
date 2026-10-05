@@ -93,6 +93,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; height:
 .steer b i { display: block; height: 100%; width: 50%; background: var(--text); opacity: .8; }
 #result { position: fixed; inset: 0; background: rgba(12, 10, 11, 0.86); display: grid; place-items: center; padding: 24px 16px; }
 #result[hidden] { display: none !important; }
+.btn.rec { width: 100%; margin-bottom: 12px; }
+.btn.rec.on { background: #c8323c; border-color: #c8323c; color: #fff; }
+#recbadge { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-variant-numeric: tabular-nums; }
+#recbadge i { width: 9px; height: 9px; border-radius: 50%; background: #e0414b; animation: recblink 1s steps(2) infinite; }
+@keyframes recblink { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { #recbadge i { animation: none; } }
+#clip { position: fixed; inset: 0; background: rgba(12, 10, 11, 0.86); display: grid; place-items: center; padding: 24px 16px; }
+#clip[hidden], #recbadge[hidden] { display: none !important; }
+#clipvid { max-width: 100%; max-height: calc(100vh - 150px); border: 1px solid var(--line); background: #000; }
 .rcard { display: flex; flex-direction: column; gap: 12px; max-width: 100%; max-height: 100%; align-items: center; }
 #resimg { max-width: 100%; max-height: calc(100vh - 150px); object-fit: contain; border: 1px solid var(--line); background: var(--ink); }
 .ractions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
@@ -158,6 +167,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     </div>
     <p class="track" id="track">No music yet. Load an audio file from your computer (MP3, WAV, M4A), or try the demo beat.</p>
     <canvas id="meter" aria-hidden="true"></canvas>
+    <button class="btn rec" id="recbtn">● Record clip (10 s max)</button>
     <div id="musicctl"></div>
     <div class="portrait">
       <h2>Song portrait</h2>
@@ -192,7 +202,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     <p class="note" id="defnote">Save as default makes the page open with your current settings in this browser.</p>
     <textarea id="defbox" readonly hidden aria-label="Settings to copy"></textarea>
   </section>
-  <p class="keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch system · <kbd>R</kbd> reseed · <kbd>Space</kbd> pause · <kbd>M</kbd> music on/off · <kbd>H</kbd> hide panel · hold <kbd>Shift</kbd> to flip the brush</p>
+  <p class="keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch system · <kbd>R</kbd> reseed · <kbd>Space</kbd> pause · <kbd>M</kbd> music on/off · <kbd>V</kbd> record clip · <kbd>H</kbd> hide panel · hold <kbd>Shift</kbd> to flip the brush</p>
 </aside>
 <button id="show" hidden>Show controls</button>
 <div id="hint"></div>
@@ -203,6 +213,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   <div class="pbar"><i id="pbarfill"></i></div>
   <div class="steer"><span>Energy</span><b><i id="steerE"></i></b><span>Brightness</span><b><i id="steerC"></i></b></div>
   <div class="swatch" id="swatch"></div>
+</div>
+<div id="recbadge" hidden><i></i><span id="rectime">REC 0.0 s</span></div>
+<div id="clip" hidden role="dialog" aria-label="Recorded clip">
+  <div class="rcard">
+    <video id="clipvid" controls playsinline loop></video>
+    <div class="ractions">
+      <p id="clipnote"></p>
+      <button class="btn primary" id="clipsave">Save clip</button>
+      <button class="btn" id="clipclose">Close</button>
+    </div>
+  </div>
 </div>
 <div id="result" hidden role="dialog" aria-label="Song portrait">
   <div class="rcard">
@@ -1063,6 +1084,7 @@ function ensureCtx() {
     AU.ctx = new C();
     AU.an = AU.ctx.createAnalyser(); AU.an.fftSize = 1024; AU.an.smoothingTimeConstant = 0.55;
     AU.out = AU.ctx.createGain(); AU.out.connect(AU.an); AU.an.connect(AU.ctx.destination);
+    try { AU.recDest = AU.ctx.createMediaStreamDestination(); AU.an.connect(AU.recDest); } catch (e) { AU.recDest = null; } // music feed for clip recording
     AU.data = new Uint8Array(AU.an.frequencyBinCount);
   }
   return true;
@@ -1843,6 +1865,72 @@ async function finishPortrait() {
     $("resimg").src = PR.url; $("resnote").textContent = `${W} × ${H} px PNG · ${nSec} section${nSec === 1 ? "" : "s"} found`; $("result").hidden = false; $("ressave").focus();
   }, "image/png");
 }
+/* ---------------- clip recording ----------------
+   Records only the animation canvas (not the panel) plus the music, up to 10 seconds.
+   MP4 where the browser can record it, otherwise WebM; both keep the animation and the sound. */
+const REC = { mr: null, chunks: [], t0: 0, timer: 0, blob: null, url: null, ext: "webm", max: 10 };
+function pickClipType() {
+  // MP4 only with H.264 (plays everywhere); otherwise WebM
+  const types = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1.42E01E,opus", "video/mp4;codecs=avc1,mp4a", "video/mp4;codecs=avc1",
+                 "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+  for (const t of types) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t; } catch (e) {} }
+  return "";
+}
+function syncRecBtn() {
+  const b = $("recbtn"), on = !!(REC.mr && REC.mr.state === "recording");
+  b.classList.toggle("on", on);
+  b.textContent = on ? `■ Stop recording · ${Math.max(0, REC.max - (performance.now() - REC.t0) / 1000).toFixed(1)} s left` : "● Record clip (10 s max)";
+}
+function startClip() {
+  if (!window.MediaRecorder || !canvas.captureStream) { setTrack("This browser can't record video from the page. Try a recent Chrome, Edge or Firefox."); return; }
+  const type = pickClipType();
+  const stream = canvas.captureStream(30);
+  if (AU.recDest && AU.playing) AU.recDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+  let mr;
+  try { mr = new MediaRecorder(stream, { mimeType: type || undefined, videoBitsPerSecond: 12e6, audioBitsPerSecond: 192e3 }); }
+  catch (e) { try { mr = new MediaRecorder(stream); } catch (e2) { setTrack("Recording couldn't start in this browser."); return; } }
+  REC.chunks = []; REC.mr = mr; REC.ext = (mr.mimeType || type).includes("mp4") ? "mp4" : "webm";
+  REC.hadAudio = stream.getAudioTracks().length > 0;
+  mr.ondataavailable = e => { if (e.data && e.data.size) REC.chunks.push(e.data); };
+  mr.onstop = () => {
+    clearInterval(REC.timer); $("recbadge").hidden = true; syncRecBtn();
+    if (!REC.chunks.length) return;
+    REC.blob = new Blob(REC.chunks, { type: mr.mimeType || (REC.ext === "mp4" ? "video/mp4" : "video/webm") });
+    if (REC.url) URL.revokeObjectURL(REC.url);
+    REC.url = URL.createObjectURL(REC.blob);
+    const secs = Math.min(REC.max, (performance.now() - REC.t0) / 1000);
+    $("clipvid").src = REC.url;
+    $("clipnote").textContent = `${secs.toFixed(1)} s · ${REC.ext.toUpperCase()} · ${(REC.blob.size / 1e6).toFixed(1)} MB` + (REC.hadAudio ? " · with music" : " · no music was playing");
+    $("clip").hidden = false; $("clipsave").focus();
+  };
+  mr.start(250);
+  REC.t0 = performance.now();
+  $("recbadge").hidden = false;
+  REC.timer = setInterval(() => {
+    const el = (performance.now() - REC.t0) / 1000;
+    $("rectime").textContent = `REC ${el.toFixed(1)} s / ${REC.max} s`;
+    syncRecBtn();
+    if (el >= REC.max) stopClip();
+  }, 100);
+  syncRecBtn();
+}
+function stopClip() { if (REC.mr && REC.mr.state === "recording") REC.mr.stop(); }
+function toggleClip() { if (REC.mr && REC.mr.state === "recording") stopClip(); else startClip(); }
+async function saveBlob(blob, filename, noteEl) {
+  let dl = null;
+  try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { dl = null; }
+  if (!dl) { // outside Claude: a normal browser download
+    try { const url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); noteEl.textContent = "Downloaded."; }
+    catch (e) { noteEl.textContent = "Couldn't start the download in this browser."; }
+    return;
+  }
+  try { await dl.save({ filename, data: blob }); noteEl.textContent = "Saved."; }
+  catch (e) {
+    if (e && e.code === "declined") return;
+    if (e && e.code === "rate_limited") { noteEl.textContent = "A save prompt is already open."; return; }
+    noteEl.textContent = "Couldn't save the file here.";
+  }
+}
 async function savePortrait() {
   if (!PR.blob) return;
   const note = $("resnote");
@@ -2000,6 +2088,13 @@ $("demo").addEventListener("click", () => { if (PR.running) cancelPortrait(); st
 $("portrait").addEventListener("click", startPortrait);
 $("progcancel").addEventListener("click", cancelPortrait);
 $("ressave").addEventListener("click", savePortrait);
+$("recbtn").addEventListener("click", toggleClip);
+$("clipclose").addEventListener("click", () => { $("clip").hidden = true; $("clipvid").pause(); });
+$("clipsave").addEventListener("click", () => {
+  if (!REC.blob) return;
+  const base = (AU.name ? AU.name.replace(/\.[^.]+$/, "") : "emergence").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 100) || "emergence";
+  saveBlob(REC.blob, `${base} - ${SYS_NAME[S.mode].toLowerCase()} clip.${REC.ext}`, $("clipnote"));
+});
 $("resclose").addEventListener("click", () => { $("result").hidden = true; setPanel(true); });
 const PNOTES = {
   fluid: "Plays the loaded song once. Each section of the song becomes a region of one image, showing the system it played. Time runs left to right.",
@@ -2057,6 +2152,7 @@ window.addEventListener("keydown", e => {
   else if (e.key === "h" || e.key === "H") setPanel($("panel").hidden);
   else if (e.key === " ") { e.preventDefault(); setPaused(!S.paused); }
   else if (e.key === "m" || e.key === "M") toggleMusic();
+  else if (e.key === "v" || e.key === "V") toggleClip();
 });
 window.addEventListener("keyup", e => { if (e.key === "Shift") ptr.shift = false; });
 
