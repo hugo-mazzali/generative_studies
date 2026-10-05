@@ -2,6 +2,8 @@
 
 Three rule systems that grow shapes on their own, react to music, and turn a whole song into a single image.
 
+![Emergence Studies: switching between SmoothLife, Particles and Reaction, with and without music](emergence-studies.gif)
+
 Built by Hugo Mazzali as a generative and interactive art project. It runs entirely in the browser (WebGL2); there's nothing to install.
 
 **Live version:** open `index.html` in a recent desktop browser, or visit the GitHub Pages link for this repository.
@@ -31,10 +33,10 @@ Pick a clip length (10, 15, 30 or 45 seconds), then click **Record clip** (or pr
 
 Load a song and choose **Make song portrait**. The page:
 
-1. Analyzes the whole song (loudness, brightness, beat density, pauses) and cuts it into at least 5 sections where the music changes most.
-2. Assigns each section the system that fits its sound (quiet and sparse → SmoothLife, steady → Reaction, loud or beat-heavy → Particles), so there are at least 4 system changes, with gradual dissolving transitions between them.
-3. Plays the song once, keeping each section's best moment.
-4. Paints one landscape image (3600 px wide): each section becomes a region in song order, meeting along wavy borders, with a legend of systems and times underneath.
+1. Analyzes the whole song (loudness, brightness, beat density, pauses) and cuts it into at least 5 parts where the music changes most.
+2. Gives each part the system that fits its sound (quiet and sparse → SmoothLife, steady → Reaction, loud or beat-heavy → Particles), so all three systems appear.
+3. Plays the song once on one large canvas that grows outward from the center. Each part grows its system in the space the growth front opens up, and when the song moves on, that part freezes in place. Nothing is cycled away: the canvas only gets added to.
+4. Saves the finished canvas as one landscape image (3600 px wide), with a timeline of the parts underneath.
 
 A **Grid of moments** style is also available.
 
