@@ -35,7 +35,7 @@ Load a song and choose **Make song portrait**. The page:
 
 1. Analyzes the whole song (loudness, brightness, beat density, pauses) and cuts it into at least 5 parts where the music changes most.
 2. Gives each part the system that fits its sound (quiet and sparse → SmoothLife, steady → Reaction, loud or beat-heavy → Particles), so all three systems appear.
-3. Plays the song once on one large canvas that grows outward from the center. Each part grows its system in the space the growth front opens up, and when the song moves on, that part freezes in place. Nothing is cycled away: the canvas only gets added to.
+3. Plays the song once on one large canvas that grows outward from the center. Each part grows its system in the space the growth front opens up, and when the song moves on, that part settles: it keeps swaying very slightly with the music while the next part grows around it. Nothing is cycled away: the canvas only gets added to.
 4. Saves the finished canvas as one landscape image (3600 px wide), with a timeline of the parts underneath.
 
 A **Grid of moments** style is also available.

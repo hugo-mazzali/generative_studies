@@ -678,8 +678,8 @@ void main(){
 }`;
 // paints the canvas with the same look as the live view; each pixel uses the palette it had when it was made
 const FS_GDISP = HDR + HASH + BICUBIC + `
-uniform sampler2D uC, uHist; uniform vec2 uRes; uniform vec4 uRect; uniform vec3 uBg;
-uniform float uTime, uGrain, uGlow, uTilt, uRim, uDrift, uGrainAnim, uFrame, uHK, uGS;
+uniform sampler2D uC, uHist, uD, uTau; uniform vec2 uRes; uniform vec4 uRect; uniform vec3 uBg;
+uniform float uTime, uGrain, uGlow, uTilt, uRim, uDrift, uGrainAnim, uFrame, uHK, uGS, uPF, uRamp, uBreath;
 out vec4 o;
 vec3 palI(int k, float t){ t = clamp(t, 0.0, 1.0) * 5.0; int i = int(min(floor(t), 4.0)); float f = t - float(i); f = f * f * (3.0 - 2.0 * f);
   return mix(texelFetch(uHist, ivec2(i, k), 0).rgb, texelFetch(uHist, ivec2(i + 1, k), 0).rgb, f); }
@@ -688,10 +688,12 @@ void main(){
   vec2 uv = (sc - uRect.xy) / (uRect.zw - uRect.xy);
   vec3 c = uBg; float body = 0.0;
   if (uv.x >= 0.0 && uv.y >= 0.0 && uv.x <= 1.0 && uv.y <= 1.0) {
+    float fw = smoothstep(uPF, uPF - uRamp, texture(uTau, uv).r);
+    uv = clamp(uv - texture(uD, uv).xy, 0.0, 1.0);
     vec2 csz = vec2(textureSize(uC, 0));
     vec4 s = bicT(uC, uv); float v = s.r, h = s.g;
     int k = int(texelFetch(uC, ivec2(min(uv * csz, csz - 1.0)), 0).b + 0.5);
-    vec4 prm = texelFetch(uHist, ivec2(6, k), 0); float edge = prm.x, soft = prm.y, dep = prm.z, hm = prm.w;
+    vec4 prm = texelFetch(uHist, ivec2(6, k), 0); float edge = prm.x - uBreath * fw, soft = prm.y, dep = prm.z, hm = prm.w;
     float shift = texelFetch(uHist, ivec2(7, k), 0).x;
     vec2 tx = uGS / csz;
     float vx = bicT(uC, uv + vec2(tx.x, 0.0)).r - bicT(uC, uv - vec2(tx.x, 0.0)).r;
@@ -740,6 +742,26 @@ void main(){
   c *= 1.0 - 0.3 * dot(q, q);
   o = vec4(max(c, 0.0), 1.0);
 }`;
+// finished parts keep swaying slightly with the music: a smooth, swirling displacement field that slowly
+// builds up with the song's energy and eases back, so shapes drift a little but never wander off
+const FS_GFLOW = HDR + `
+uniform sampler2D uD, uTau; uniform vec2 uOut; uniform float uT, uAmp, uPF, uRamp, uDamp, uAspect;
+out vec4 o;
+float h2(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 19.19); return fract(p.x * p.y); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h2(i), h2(i + vec2(1,0)), f.x), mix(h2(i + vec2(0,1)), h2(i + vec2(1,1)), f.x), f.y); }
+float psi(vec2 q){ return vn(q * 2.2 + vec2(uT * 0.11, -uT * 0.07)) + 0.5 * vn(q * 4.7 - vec2(uT * 0.05, uT * 0.13) + 7.3); }
+void main(){
+  vec2 uv = gl_FragCoord.xy / uOut;
+  vec2 d = texture(uD, uv).xy;
+  float w = smoothstep(uPF, uPF - uRamp, texture(uTau, uv).r);   // 1 in finished parts, 0 where things still grow
+  vec2 q = vec2((uv.x - d.x) * uAspect, uv.y - d.y), e = vec2(0.004, 0.0);
+  vec2 v = vec2(psi(q + e.yx) - psi(q - e.yx), -(psi(q + e) - psi(q - e))) / 0.008;  // swirl only: shapes don't squash
+  v.x /= uAspect;
+  d = (d + v * uAmp * w) * uDamp;
+  o = vec4(w > 0.001 ? d : vec2(0.0), 0.0, 1.0);
+}`;
+const progGFlow = program(VS_QUAD, FS_GFLOW);
 const progGComp = program(VS_QUAD, FS_GCOMP);
 const progGSeed = program(VS_QUAD, FS_GSEED);
 const progGDisp = program(VS_QUAD, FS_GDISP);
@@ -1098,7 +1120,7 @@ function render(time) {
   gl.uniform1f(progView.u.uPhase, S.mode === "sl" ? (S.paused ? 1 : Math.min(1, Math.max(0, slAcc))) : 1);
   gl.uniform1i(progView.u.uMode, MODE_IDX[S.mode]); gl.uniform1f(progView.u.uDensity, P.pl.density);
   drawQuad(view);
-  if (GR.on) { growComposite(); growDisplay(time, null); return; }
+  if (GR.on) { growComposite(); if (!S.paused) growFlow(); growDisplay(time, null); return; }
   // during a system change, dissolve the old system's shapes into the new one
   let disp = view;
   if (TR.active) {
@@ -1675,7 +1697,7 @@ function directSystem(el) {
    on that band freezes. The finished canvas is the image. */
 const GR = { on: false, started: false, aspect: 1.5, scale: 2.2, TW: 600, TH: 400, CW: 1440, CH: 960, NH: 2048,
   dp: null, sorted: null, tauTex: null, C: null, F: null, hist: null, histRow: new Float32Array(32),
-  pN: 0, pF: 0, pS: 0, dN: 0, dF: -1, dS: -1, idx: 0, hInt: 0.2, Dmin: 0.05, Dmax: 0.24, rect: [0, 0, 1, 1], rectT: 0 };
+  pN: 0, pF: 0, pS: 0, dN: 0, dF: -1, dS: -1, idx: 0, D: null, env: 0, breath: 0, ft: 0, hInt: 0.2, Dmin: 0.05, Dmax: 0.24, rect: [0, 0, 1, 1], rectT: 0 };
 function gh2(x, y) { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); }
 function gvn(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
   const a = gh2(xi, yi), b = gh2(xi + 1, yi), c = gh2(xi, yi + 1), d = gh2(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
@@ -1694,7 +1716,7 @@ function growRange(lo, hi) {
 }
 function clampTex(t) { gl.bindTexture(gl.TEXTURE_2D, t.tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); }
 function clearTarget(t) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.viewport(0, 0, t.w, t.h); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); gl.bindFramebuffer(gl.FRAMEBUFFER, null); }
-function growFree() { if (GR.C) { freeTarget(GR.C[0]); freeTarget(GR.C[1]); } freeTarget(GR.F); freeTarget(GR.tauTex); freeTarget(GR.hist); GR.C = GR.F = GR.tauTex = GR.hist = null; }
+function growFree() { if (GR.C) { freeTarget(GR.C[0]); freeTarget(GR.C[1]); } if (GR.D) { freeTarget(GR.D[0]); freeTarget(GR.D[1]); } freeTarget(GR.F); freeTarget(GR.tauTex); freeTarget(GR.hist); GR.C = GR.D = GR.F = GR.tauTex = GR.hist = null; }
 function growInit() {
   growFree();
   const W = GR.TW, H = GR.TH, N = W * H, sx = Math.random() * 60, sy = Math.random() * 60;
@@ -1712,6 +1734,9 @@ function growInit() {
   GR.C = [makeTarget(GR.CW, GR.CH, VIEWF, true), makeTarget(GR.CW, GR.CH, VIEWF, true)]; GR.F = makeTarget(GR.CW, GR.CH, VIEWF, false);
   [GR.C[0], GR.C[1]].forEach(clampTex); clearTarget(GR.C[0]); clearTarget(GR.C[1]); clearTarget(GR.F);
   GR.hist = makeTarget(8, GR.NH, VIEWF, false);
+  GR.D = [makeTarget(300, 200, VIEWF, true), makeTarget(300, 200, VIEWF, true)];
+  GR.D.forEach(t => { clampTex(t); gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.viewport(0, 0, t.w, t.h); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); });
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); GR.env = 0; GR.breath = 0; GR.ft = 0;
   GR.hInt = Math.max(0.15, PR.dur / (GR.NH - 8));
   GR.started = false; GR.dS = -1; GR.dF = -1; GR.dFsec = -1; GR.pF = 0; GR.pS = 0; GR.rectT = 0;
 }
@@ -1723,6 +1748,10 @@ function growUpdate(el) {
   const dF = Math.max(GR.dFsec, GR.dN - GR.Dmax);
   GR.dF = dF; GR.pF = growPOf(dF); GR.pS = Math.max(GR.pF, growPOf(GR.dS));
   GR.idx = Math.min(GR.NH - 1, Math.floor(el / GR.hInt));
+  // very slow response for the finished parts: the song's level and bass, smoothed over a couple of seconds
+  const R = aR(), kk = 1 - Math.exp(-(1 / 60) / 1.8);
+  GR.env += (Math.min(1.5, 0.12 + AU.level * 1.6 * R + (AU.beatHit ? 0.6 * R : 0)) - GR.env) * kk;
+  GR.breath += (Math.min(0.05, AU.bass * 0.05 * R) - GR.breath) * kk;
   paletteNow();
   const r = GR.histRow, mp = P[S.mode];
   for (let i = 0; i < 6; i++) { r[i * 4] = palFlat[i * 3]; r[i * 4 + 1] = palFlat[i * 3 + 1]; r[i * 4 + 2] = palFlat[i * 3 + 2]; r[i * 4 + 3] = 1; }
@@ -1745,6 +1774,16 @@ function growSeedFromOld() {
   gl.uniform2i(u.uSize, ping[0].w, ping[0].h); gl.uniform1i(u.uMode, S.mode === "sl" ? 0 : 1); gl.uniform1f(u.uPF, GR.pF); gl.uniform1f(u.uPS, GR.pS);
   drawQuad(ping[1]); ping.reverse();
 }
+function growFlow() {
+  if (GR.pF <= 0) return;
+  GR.ft += 1 / 60 * (0.4 + GR.env);
+  gl.useProgram(progGFlow.p); const u = progGFlow.u;
+  bindTex(0, GR.D[0]); gl.uniform1i(u.uD, 0); bindTex(1, GR.tauTex); gl.uniform1i(u.uTau, 1);
+  gl.uniform2f(u.uOut, GR.D[1].w, GR.D[1].h); gl.uniform1f(u.uT, GR.ft); gl.uniform1f(u.uAmp, 1.6e-5 * GR.env);
+  gl.uniform1f(u.uPF, GR.pF); gl.uniform1f(u.uRamp, growRamp()); gl.uniform1f(u.uDamp, 0.996); gl.uniform1f(u.uAspect, GR.aspect);
+  drawQuad(GR.D[1]); GR.D.reverse();
+}
+function growRamp() { return Math.max(1e-4, GR.pF - growPOf(GR.dF - 0.04)); }
 function growComposite() {
   gl.useProgram(progGComp.p); const u = progGComp.u;
   bindTex(0, view); gl.uniform1i(u.uView, 0); bindTex(1, GR.C[0]); gl.uniform1i(u.uPrev, 1);
@@ -1766,6 +1805,8 @@ function growDisplay(time, target) {
   if (!target && (GR.rectT++ % 15) === 0) growRect();
   gl.useProgram(progGDisp.p); const u = progGDisp.u;
   bindTex(0, GR.C[0]); gl.uniform1i(u.uC, 0); bindTex(1, GR.hist); gl.uniform1i(u.uHist, 1);
+  bindTex(2, GR.D[0]); gl.uniform1i(u.uD, 2); bindTex(3, GR.tauTex); gl.uniform1i(u.uTau, 3);
+  gl.uniform1f(u.uPF, GR.pF); gl.uniform1f(u.uRamp, growRamp()); gl.uniform1f(u.uBreath, target ? 0 : GR.breath);
   const W = target ? target.w : canvas.width, H = target ? target.h : canvas.height;
   gl.uniform2f(u.uRes, W, H); gl.uniform4fv(u.uRect, target ? [0, 0, 1, 1] : GR.rect); gl.uniform3fv(u.uBg, BG);
   gl.uniform1f(u.uTime, time); gl.uniform1f(u.uGrain, look.grain * (target ? 0.8 : 1)); gl.uniform1f(u.uGlow, look.glow); gl.uniform1f(u.uTilt, look.tilt);
@@ -2232,7 +2273,7 @@ $("clipsave").addEventListener("click", () => {
 });
 $("resclose").addEventListener("click", () => { $("result").hidden = true; setPanel(true); });
 const PNOTES = {
-  grow: "Plays the loaded song once on one large canvas. Each part of the song grows its system outward from the center, and earlier parts freeze in place, so the finished canvas is the image.",
+  grow: "Plays the loaded song once on one large canvas. Each part of the song grows its system outward from the center; earlier parts settle and keep swaying very slightly with the music. The finished canvas is the image.",
   grid: "Plays the loaded song once and lays out a grid of moments, one row per section of the song."
 };
 function syncPortraitUI() {
