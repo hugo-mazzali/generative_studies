@@ -75,6 +75,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; height:
 .brushrow button[aria-pressed="true"] { color: var(--ink); background: var(--text); }
 .musicrow { display: grid; grid-template-columns: 1.25fr 1fr 0.8fr; gap: 6px; }
 .musicrow .btn { text-align: center; display: flex; align-items: center; justify-content: center; }
+.liverow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+#livedev { width: 100%; margin-top: 6px; background: var(--ink); color: var(--text); border: 1px solid var(--line); border-radius: 3px; padding: 6px; font: 500 11px var(--mono); }
+.track b { color: var(--text); font-weight: 500; }
 .btn:disabled { opacity: .4; cursor: default; }
 .track { color: var(--muted); margin: 9px 0 8px; line-height: 1.5; overflow-wrap: anywhere; }
 .track.on { color: var(--text); }
@@ -187,7 +190,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
       <button class="btn" id="demo">Demo beat</button>
       <button class="btn" id="play" disabled>Play</button>
     </div>
-    <p class="track" id="track">No music yet. Load an audio file from your computer (MP3, WAV, M4A), or try the demo beat.</p>
+    <div class="liverow">
+      <button class="btn" id="livein">Live input</button>
+      <button class="btn" id="livesys">Computer audio</button>
+    </div>
+    <select id="livedev" hidden aria-label="Live input device"></select>
+    <p class="track" id="track">No music yet. Load an audio file, try the demo beat, or listen live: <b>Live input</b> hears a microphone or line-in (a stereo plugged into the laptop), <b>Computer audio</b> hears whatever this computer is playing.</p>
     <div class="scrub" id="scrub" hidden>
       <label for="songpos"><span>Song position</span><output id="songtime">0:00 / 0:00</output></label>
       <input type="range" id="songpos" min="0" max="1" step="0.1" value="0">
@@ -1344,6 +1352,12 @@ function ensureCtx() {
 }
 function stopSources() {
   if (AU.src) { try { AU.src.stop(); } catch (e) {} AU.src.disconnect(); AU.src = null; }
+  if (AU.live) {
+    try { AU.live.node.disconnect(); AU.live.gain.disconnect(); } catch (e) {}
+    AU.live.stream.getTracks().forEach(t => t.stop()); AU.live = null;
+    try { AU.an.connect(AU.ctx.destination); } catch (e) {}   // songs and the demo are heard again
+    $("livein").classList.remove("primary"); $("livesys").classList.remove("primary"); $("livedev").hidden = true;
+  }
   if (AU.demo) { clearInterval(AU.demo.timer); AU.demo.bus.disconnect(); AU.demo = null; }
 }
 function setTrack(text, on) { const t = $("track"); t.textContent = text; t.classList.toggle("on", !!on); }
@@ -1393,6 +1407,51 @@ function syncScrub() {
   const pos = scrubbing ? parseFloat(el.value) : songPos();
   if (!scrubbing) el.value = pos;
   $("songtime").textContent = `${fmtTime(pos)} / ${fmtTime(d)}`;
+}
+/* Live input: the page listens instead of playing. "Live input" = a microphone or line-in (for a stereo,
+   run its headphone/line out into the laptop's line-in or a USB audio adapter); "Computer audio" = whatever this
+   computer plays (Spotify, YouTube...), captured through the browser's screen-share audio. The sound is only
+   analysed, never played back, so there's no echo. Levels are evened out automatically. */
+async function startLive(kind, deviceId) {
+  if (!ensureCtx()) { setTrack("This browser can't analyse audio."); return; }
+  if (PR.running) cancelPortrait();
+  let stream = null;
+  try {
+    if (kind === "sys") {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) throw new Error("nodisplay");
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, systemAudio: "include" });
+      stream.getVideoTracks().forEach(t => t.stop());
+      if (!stream.getAudioTracks().length) { setTrack("No sound came through. Share again and pick the whole screen (or a tab) with “Share system audio” / “Share tab audio” turned on."); return; }
+    } else {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("nomedia");
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: deviceId ? { exact: deviceId } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    }
+  } catch (e) {
+    const msg = kind === "sys" ? "Couldn't capture the computer's sound. It works in Chrome or Edge: share the entire screen or a tab with audio turned on."
+      : "Couldn't open a microphone or line-in. Allow microphone access for this page (the page in Claude may block it; the GitHub version won't).";
+    setTrack(msg); return;
+  }
+  stopSources();
+  try { AU.an.disconnect(AU.ctx.destination); } catch (e) {}       // listen only: never play the input back
+  const node = AU.ctx.createMediaStreamSource(stream), gain = AU.ctx.createGain(); gain.gain.value = 2;
+  node.connect(gain); gain.connect(AU.an);
+  AU.live = { stream, node, gain, kind, lvl: 0.2 }; AU.mode = "live";
+  const tr = stream.getAudioTracks()[0];
+  AU.name = kind === "sys" ? "computer audio" : (tr && tr.label ? tr.label : "live input");
+  tr.addEventListener("ended", () => { if (AU.live && AU.live.stream === stream) { stopSources(); AU.mode = null; AU.playing = false; setTrack("Live input stopped.", false); syncPlay(); } });
+  AU.ctx.resume(); AU.playing = true;
+  setTrack("Listening live: " + AU.name, true); syncPlay();
+  $(kind === "sys" ? "livesys" : "livein").classList.add("primary");
+  if (kind !== "sys") listInputs(tr && tr.getSettings ? tr.getSettings().deviceId : "");
+}
+// device names are only shown by the browser after access is granted, so the list is filled in afterwards
+async function listInputs(current) {
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput");
+    const sel = $("livedev"); sel.innerHTML = "";
+    devs.forEach((d, i) => { const o = document.createElement("option"); o.value = d.deviceId; o.textContent = d.label || `Input ${i + 1}`; if (d.deviceId === current) o.selected = true; sel.appendChild(o); });
+    sel.hidden = devs.length < 2;
+  } catch (e) {}
 }
 // A small synthesized beat (120 BPM) so the reaction can be tried without a file.
 function startDemo() {
@@ -1454,6 +1513,11 @@ function audioUpdate() {
     for (let i = a; i <= b; i++) { s += d[i]; n++; } return n ? s / n / 255 : 0;
   };
   const b = band(25, 150), m = band(150, 2000), h = band(2000, 9000);
+  if (AU.live) { // slow automatic gain so quiet rooms and loud line-ins both drive the visuals
+    const L = AU.live, lv = (b + m + h) / 3; L.lvl += (lv - L.lvl) * 0.01;
+    const g = L.gain.gain, want = L.lvl < 0.3 ? 1.006 : L.lvl > 0.42 ? 0.994 : 1;
+    if (want !== 1 && lv > 0.02) g.value = Math.min(40, Math.max(0.3, g.value * want));
+  }
   AU.bass += (b - AU.bass) * 0.55; AU.mid += (m - AU.mid) * 0.35; AU.high += (h - AU.high) * 0.45;
   AU.level = (AU.bass + AU.mid + AU.high) / 3;
   AU.avg = AU.avg * 0.94 + b * 0.06;
@@ -2296,6 +2360,9 @@ $("reseed").addEventListener("click", seed);
 $("song").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (f) playSong(f); e.target.value = ""; });
 $("songlabel").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("song").click(); } });
 $("demo").addEventListener("click", () => { if (PR.running) cancelPortrait(); startDemo(); });
+$("livein").addEventListener("click", () => startLive("in", $("livedev").value || undefined));
+$("livesys").addEventListener("click", () => startLive("sys"));
+$("livedev").addEventListener("change", e => startLive("in", e.target.value));
 $("portrait").addEventListener("click", startPortrait);
 $("progcancel").addEventListener("click", cancelPortrait);
 $("ressave").addEventListener("click", savePortrait);

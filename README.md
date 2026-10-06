@@ -18,6 +18,11 @@ Built by Hugo Mazzali as a generative and interactive art project. It runs entir
 
 All three share one renderer: a heat-map palette, film grain, glow and rim light on a warm near-black background, inside a frame that keeps everything on screen.
 
+## Hooking up a stereo
+
+- **Music from the laptop**: plug the laptop into the stereo (aux cable, Bluetooth or a USB audio adapter). Load songs in the page, or play from any app and click **Computer audio**.
+- **Music from another source** (phone, turntable, mixer): run the stereo's headphone, line or REC out into the laptop's line-in or a USB audio adapter and click **Live input**, or simply let the laptop's microphone hear the room.
+
 ## Projector output
 
 **Open output window** opens just the animation (no controls) in a second window. Drag it onto the projector and double-click it for full screen (Esc or double-click again to leave). The controls window keeps a live preview in the same shape, where you can still draw and drag the frame, and keyboard shortcuts work in either window. Keep the controls window open (not minimized) so the animation keeps running. With one screen, **Full screen here** hides the controls and fills the screen (Esc brings them back).
@@ -31,6 +36,7 @@ Drag any frame's edge to move it, or a corner to resize it (handy for lining fra
 ## Music
 
 - **Load a song** (MP3, WAV, M4A) or use the built-in **Demo beat**. Audio is analyzed live in the page; nothing is uploaded anywhere.
+- **Listen live**: **Live input** listens to a microphone or line-in (pick the device in the list that appears), and **Computer audio** listens to whatever the computer is playing (Spotify, YouTube…; Chrome or Edge, share the screen or a tab with audio turned on). Live sound is only analysed, never played back, and its level is evened out automatically.
 - **Song position**: drag the slider under the track name to jump to any part of a loaded song.
 - **Beats push the shapes around**: each beat sends a shockwave from a random point that shoves and spins nearby shapes. **Beat sensitivity** and **Beat push** tune how much the music moves things.
 - **The song steers the rules**: brightness (treble vs bass) moves the feed rate and blends the colors, and loudness changes pattern scale and hue. Steering is gentle in soft passages and strong in full ones.
