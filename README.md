@@ -22,9 +22,11 @@ All three share one renderer: a heat-map palette, film grain, glow and rim light
 
 **Open output window** opens just the animation (no controls) in a second window. Drag it onto the projector and double-click it for full screen (Esc or double-click again to leave). The controls window keeps a live preview in the same shape, where you can still draw and drag the frame, and keyboard shortcuts work in either window. Keep the controls window open (not minimized) so the animation keeps running. With one screen, **Full screen here** hides the controls and fills the screen (Esc brings them back).
 
-## Frame
+## Frames
 
-Drag the frame's edge to move it, or a corner to resize it (handy for lining it up with a projection surface). **Fluid** hides the frame and replaces the hard wall with a soft, invisible boundary that wobbles and swells with the music: shapes fade out gently as they drift past it and particles are pulled back in, so the system's own shapes form the edge (the line shows faintly only while you hover over it to drag). **Reset frame** puts it back.
+The picture can hold up to 4 frames, each running its own system with its own preset, palette, position and shape. **+ Add frame** adds one (the next system and palette), **Remove frame** removes the selected one. Click inside a frame (or its chip in the panel) to select it; the system tabs, presets, rules, brush, frame shape and palette in the panel all change the selected frame. Rules sliders are shared by frames running the same system.
+
+Drag any frame's edge to move it, or a corner to resize it (handy for lining frames up with a projection surface). **Fluid** hides the selected frame's line and replaces its hard wall with a soft, invisible boundary that wobbles and swells with the music: shapes fade out gently as they drift past it and particles are pulled back in, so the system's own shapes form the edge (the line shows faintly only while you hover over it to drag). **Reset frame** fits the selected frame to the screen again.
 
 ## Music
 

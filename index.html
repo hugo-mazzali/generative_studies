@@ -87,6 +87,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; height:
 .portrait h2 { margin: 0; }
 .note { color: var(--muted); margin: 0; line-height: 1.5; }
 .framenote { margin: 8px 0; }
+.frameadd { margin: 8px 0; }
 .btn.wide { width: 100%; }
 .actions.two { grid-template-columns: 1fr 1fr; }
 .outnote { margin-top: 8px; }
@@ -147,6 +148,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   </section>
 
   <section>
+    <h2>Frames</h2>
+    <div class="chips" id="framelist"></div>
+    <div class="actions two frameadd">
+      <button class="btn" id="fradd">+ Add frame</button>
+      <button class="btn" id="frdel">Remove frame</button>
+    </div>
+    <div class="brushrow" id="frameshape"><button id="fr-straight">Straight</button><button id="fr-fluid">Fluid</button></div>
+    <p class="note framenote">Each frame runs its own system. Click inside a frame to select it; everything below changes the selected frame. Drag a frame's edge to move it, or a corner to resize it.</p>
+    <button class="btn wide" id="frreset">Reset frame</button>
+  </section>
+
+  <section>
     <div class="tabs" role="tablist" id="tabs"></div>
     <p class="blurb" id="blurb"></p>
   </section>
@@ -187,13 +200,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
       <label class="toggle"><input type="checkbox" id="autodir" checked> <span>Let the song choose the system and presets</span></label>
       <button class="btn primary" id="portrait" disabled>Make song portrait</button>
     </div>
-  </section>
-
-  <section>
-    <h2>Frame</h2>
-    <div class="brushrow" id="frameshape"><button id="fr-straight">Straight</button><button id="fr-fluid">Fluid</button></div>
-    <p class="note framenote">Drag the frame's edge to move it, or a corner to resize it.</p>
-    <button class="btn wide" id="frreset">Reset frame</button>
   </section>
 
   <section>
@@ -594,31 +600,19 @@ void main(){
   float hi = max(dot(n, L) - 0.62, 0.0) * 2.6 * band * uRim;
   float sh = max(-dot(n.xy, normalize(L.xy)), 0.0) * band * uRim * 0.45;
 
-  vec3 c = uBg;
-  vec3 dim = vec3(1.0 - (uv.y - 0.5) * 0.15);
-  c += pal(t * 0.55 + 0.1) * halo * uGlow * 0.75;
-  vec3 fill = col * (0.78 + 0.32 * v) * (1.0 - sh);
-  c = mix(c, fill, body);
-  c += hi * vec3(1.0, 0.95, 0.86) * body;
-  c *= dim;
+  // this frame as a layer: glow adds light, the shapes cover what's behind them (premultiplied alpha)
+  vec3 glow = pal(t * 0.55 + 0.1) * halo * uGlow * 0.75;
+  vec3 fill = col * (0.78 + 0.32 * v) * (1.0 - sh) + hi * vec3(1.0, 0.95, 0.86);
+  vec3 c = fill * body + glow * (1.0 - body);
+  float a = body;
   if (uBoxOn > 0.5) {
-    // thin rounded frame around the particle container
+    // thin rounded frame line (hidden for fluid frames unless the pointer is on it)
     float sd = boxSD(uv, uRes.x / uRes.y) * uRes.y;   // pixels from the frame line
     float lw = max(1.0, uRes.y / 700.0) * (1.0 + uHot);
-    float line = 1.0 - smoothstep(lw * 0.5, lw * 0.5 + 1.0, abs(sd));
-    float vis = uFluid > 0.5 ? 0.0 : 1.0;
-    c *= 1.0 - 0.18 * smoothstep(0.0, 2.0, sd) * vis;
-    c = mix(c, vec3(0.95, 0.9, 0.84), line * (0.38 * vis + 0.45 * uHot));
+    float line = (1.0 - smoothstep(lw * 0.5, lw * 0.5 + 1.0, abs(sd))) * ((uFluid > 0.5 ? 0.0 : 0.38) + 0.45 * uHot);
+    c = c * (1.0 - line) + vec3(0.95, 0.9, 0.84) * line; a = a + line * (1.0 - a);
   }
-
-  float g = hash(gl_FragCoord.xy + fract(uTime * 7.13 * uGrainAnim) * vec2(97.1, 61.7)) - 0.5;
-  float g2 = hash(gl_FragCoord.xy * 0.5 + 17.0 + floor(uTime * 12.0 * uGrainAnim)) - 0.5;
-  c += (g * 0.75 + g2 * 0.35) * uGrain * (0.55 + 0.45 * body);
-  c *= 1.0 + g * uGrain * 0.5;
-
-  vec2 q = (uv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
-  c *= 1.0 - 0.32 * dot(q, q);
-  o = vec4(max(c, 0.0), 1.0);
+  o = vec4(max(c, 0.0), a);
 }`;
 
 function compile(type, src) {
@@ -790,6 +784,25 @@ const progCopy = program(VS_QUAD, FS_COPY);
 const progDissolve = program(VS_QUAD, FS_DISSOLVE);
 const progView = program(VS_QUAD, FS_VIEW);
 const progDisp = program(VS_QUAD, FS_DISPLAY);
+// after all frames are drawn: background, light falloff, film grain and vignette over the whole picture
+const FS_POST = HDR + HASH + `
+uniform sampler2D uS; uniform vec2 uRes; uniform vec3 uBg; uniform float uTime, uGrain, uGrainAnim;
+out vec4 o;
+void main(){
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec4 L = texelFetch(uS, ivec2(gl_FragCoord.xy), 0);
+  float body = clamp(L.a, 0.0, 1.0);
+  vec3 c = uBg * (1.0 - body) + L.rgb;
+  c *= 1.0 - (uv.y - 0.5) * 0.15;
+  float g = hash(gl_FragCoord.xy + fract(uTime * 7.13 * uGrainAnim) * vec2(97.1, 61.7)) - 0.5;
+  float g2 = hash(gl_FragCoord.xy * 0.5 + 17.0 + floor(uTime * 12.0 * uGrainAnim)) - 0.5;
+  c += (g * 0.75 + g2 * 0.35) * uGrain * (0.55 + 0.45 * body);
+  c *= 1.0 + g * uGrain * 0.5;
+  vec2 q = (uv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
+  c *= 1.0 - 0.32 * dot(q, q);
+  o = vec4(max(c, 0.0), 1.0);
+}`;
+const progPost = program(VS_QUAD, FS_POST);
 
 const quadVao = gl.createVertexArray(); gl.bindVertexArray(quadVao);
 const qb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, qb);
@@ -1008,7 +1021,7 @@ function plStep() {
   const { n, m, X, Y, VX, VY, T, M } = PL; const W = aspect, hw = W / 2;
   const sc = GR.on ? GR.scale : 1;
   const rMax = plRmax() / sc, r2 = rMax * rMax, dt = 0.02, fr = Math.pow(0.5, dt / P.pl.friction), ff = rMax * P.pl.force * (1 + aR() * AU.bass * 1.3);
-  const brushOn = ptr.down && !GR.on, bx = ptr.x * W, by = ptr.y, bR = 0.14;
+  const brushOn = ptr.down && !GR.on && FR.cur === FR.sel, bx = ptr.x * W, by = ptr.y, bR = 0.14;
   const sign = (S.flip !== (ptr.shift || ptr.right)) ? -1 : 1;
   const inset = P.pl.blob * 0.55 / sc;
   const wx0 = BOX.x0 * W + inset, wx1 = Math.max(wx0 + 0.01, BOX.x1 * W - inset);
@@ -1102,7 +1115,7 @@ function plRender() {
 
 /* ---------------- simulation steps ---------------- */
 function brushVec(radius) {
-  if (!ptr.down || GR.on) return [0, 0, 0, 0];
+  if (!ptr.down || GR.on || FR.cur !== FR.sel) return [0, 0, 0, 0];
   const erase = S.flip !== (ptr.shift || ptr.right);
   return [ptr.x, ptr.y, radius, erase ? -1 : 1];
 }
@@ -1203,6 +1216,24 @@ function render(time) {
   gl.uniform1f(u.uBoxOn, 1.0);
   gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1); ctUniforms(u); gl.uniform1f(u.uHot, CT.hot);
   gl.uniform1f(u.uGrainAnim, reduceMotion ? 0.0 : 1.0);
+  ensureScene();
+  // only the frame's area (plus room for its glow) needs drawing
+  const W = SCN.w, H = SCN.h, mg = 0.07 * H;
+  const x0 = Math.max(0, Math.floor(BOX.x0 * W - mg)), y0 = Math.max(0, Math.floor(BOX.y0 * H - mg));
+  const x1 = Math.min(W, Math.ceil(BOX.x1 * W + mg)), y1 = Math.min(H, Math.ceil(BOX.y1 * H + mg));
+  gl.uniform1f(u.uHot, FR.hover === FR.cur ? CT.hot : 0);
+  gl.enable(gl.SCISSOR_TEST); gl.scissor(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  drawQuad(SCN);
+  gl.disable(gl.BLEND); gl.disable(gl.SCISSOR_TEST);
+}
+let SCN = null;
+function ensureScene() { if (!SCN || SCN.w !== canvas.width || SCN.h !== canvas.height) { freeTarget(SCN); SCN = makeTarget(canvas.width, canvas.height, VIEWF, false); } }
+function clearScene() { ensureScene(); gl.bindFramebuffer(gl.FRAMEBUFFER, SCN.fbo); gl.viewport(0, 0, SCN.w, SCN.h); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+function postPass(time) {
+  gl.useProgram(progPost.p); const u = progPost.u;
+  bindTex(0, SCN); gl.uniform1i(u.uS, 0); gl.uniform2f(u.uRes, canvas.width, canvas.height); gl.uniform3fv(u.uBg, BG);
+  gl.uniform1f(u.uTime, time); gl.uniform1f(u.uGrain, look.grain + AU.high * aR() * 0.05); gl.uniform1f(u.uGrainAnim, reduceMotion ? 0.0 : 1.0);
   drawQuad(null);
 }
 
@@ -1220,7 +1251,7 @@ function sizeCanvas() {
 }
 window.addEventListener("resize", () => {
   clearTimeout(rebuildTimer);
-  rebuildTimer = setTimeout(() => { if (sizeCanvas() && !GR.on) setupMode(); }, 180);
+  rebuildTimer = setTimeout(() => { if (sizeCanvas() && !GR.on) rebuildAll(); }, 180);
 });
 
 /* ---------------- output window (for a projector) ----------------
@@ -1243,7 +1274,7 @@ function outMeasure() {
   let w = Math.round((W.innerWidth || 1280) * d), h = Math.round((W.innerHeight || 720) * d);
   const k = Math.min(1, 2560 / w, 1600 / h); OUT.w = Math.max(160, Math.round(w * k)); OUT.h = Math.max(90, Math.round(h * k));
 }
-function outResized() { outMeasure(); clearTimeout(rebuildTimer); rebuildTimer = setTimeout(() => { if (sizeCanvas() && !GR.on) setupMode(); }, 180); }
+function outResized() { outMeasure(); clearTimeout(rebuildTimer); rebuildTimer = setTimeout(() => { if (sizeCanvas() && !GR.on) rebuildAll(); }, 180); }
 function openOutput() {
   if (outActive()) { OUT.win.focus(); return; }
   let W = null;
@@ -1285,7 +1316,7 @@ function closeOutput() {
   ["left", "top", "width", "height"].forEach(k => canvas.style[k] = "");
   $("outbtn").textContent = "Open output window";
   $("outnote").textContent = "Opens just the animation in its own window. Drag that window onto the projector and double-click it for full screen. Keep this controls window open.";
-  if (sizeCanvas() && !GR.on) setupMode();
+  if (sizeCanvas() && !GR.on) rebuildAll();
 }
 // one-screen option: full screen this window with the controls hidden (H or Esc brings them back)
 function fullHere() {
@@ -1477,7 +1508,8 @@ function motionUpdate(dt) {
     const s = music.push * (0.6 + AU.bass);
     const q = GR.on ? growPoint(0.2) : null;
     if (q) IMP.push({ x: q[0], y: q[1], str: 0.011 * s / GR.scale * 1.3, age: 0, swirl: rand(-0.85, 0.85) });
-    else IMP.push({ x: rand(BOX.x0 + 0.08, BOX.x1 - 0.08), y: rand(BOX.y0 + 0.08, BOX.y1 - 0.08), str: 0.011 * s, age: 0, swirl: rand(-0.85, 0.85) });
+    else { const fb = FR.list.length ? frameBox(FR.list[Math.floor(Math.random() * FR.list.length)]) : BOX;
+      IMP.push({ x: rand(fb.x0 + 0.04, fb.x1 - 0.04), y: rand(fb.y0 + 0.04, fb.y1 - 0.04), str: 0.011 * s, age: 0, swirl: rand(-0.85, 0.85) }); }
     if (IMP.length > 6) IMP.shift();
     if (!PR.running) { const a = rand(0, Math.PI * 2); toss[0] += Math.cos(a) * 0.003 * s; toss[1] += Math.sin(a) * 0.003 * s; }
   }
@@ -1971,7 +2003,7 @@ async function finishGrow() {
 function restoreAfterPortrait() {
   if (GR.on) { GR.on = false; growFree(); }
   if (!PR.saved) return;
-  applySettings(PR.saved); PR.saved = null; syncAllUI(); sizeCanvas(); setupMode();
+  applySettings(PR.saved); PR.saved = null; syncAllUI(); sizeCanvas(); rebuildAll();
 }
 
 function startPortrait() {
@@ -2056,13 +2088,31 @@ async function savePortrait() {
 
 let lastAlive = 0, fpsT = 0, fpsN = 0, lastT = 0;
 const fpsEl = document.getElementById("fps");
-function frame(ms) {
-  const time = ms * 0.001, dt = Math.min(0.05, Math.max(0, time - lastT)); lastT = time;
-  audioUpdate();
-  motionUpdate(dt);
-  steerUpdate(dt);
+/* ---------------- frames ----------------
+   Each frame is its own container with its own system, preset, palette, position and shape.
+   The rest of the code works on "the loaded frame" (S.mode, ping, view, PL, BOX, ...): the loop loads each frame
+   in turn, steps and draws it, and stores it again. Between frames the selected one stays loaded, so the panel
+   controls always act on it. */
+const FR = { list: [], sel: null, cur: null, hover: null, next: 1, max: 4 };
+function saveCtx(f) {
+  Object.assign(f, { mode: S.mode, preset: S.preset, pal: S.pal, flip: S.flip, gsScale: S.gsScale, ping, view, field,
+    pl: { ...PL }, box: { ...BOX }, custom: CT.custom, fluid: CT.fluid, slAcc, lastAlive, slCheckT, slBuf });
+}
+function loadCtx(f) {
+  S.mode = f.mode; S.preset = f.preset; S.pal = f.pal; S.flip = f.flip; S.gsScale = f.gsScale;
+  ping = f.ping; view = f.view; field = f.field; Object.assign(PL, f.pl); Object.assign(BOX, f.box);
+  CT.custom = f.custom; CT.fluid = f.fluid; slAcc = f.slAcc; lastAlive = f.lastAlive; slCheckT = f.slCheckT; slBuf = f.slBuf;
+  FR.cur = f;
+}
+function frameBox(f) { return f === FR.cur ? BOX : f.box; }
+// run fn with frame f loaded, then put the selected frame back
+function withFrame(f, fn) {
+  if (f === FR.sel) { FR.cur = f; return fn(); }
+  saveCtx(FR.sel); loadCtx(f);
+  try { return fn(); } finally { saveCtx(f); loadCtx(FR.sel); }
+}
+function stepFrame(time) {
   steerScale(time);
-  ctUpdate(dt);
   if (!S.paused) {
     if (S.mode === "sl") {
       stepSL(time);
@@ -2072,9 +2122,23 @@ function frame(ms) {
     } else if (S.mode === "gs") stepGS();
     else plStep();
   }
-  if ((fpsN & 15) === 0) updateBox();
+  updateBox();
   if (S.mode === "pl") plRender();
-  render(time);
+}
+function frame(ms) {
+  const time = ms * 0.001, dt = Math.min(0.05, Math.max(0, time - lastT)); lastT = time;
+  audioUpdate();
+  motionUpdate(dt);
+  steerUpdate(dt);
+  ctUpdate(dt);
+  if (GR.on) { // song portrait: only the selected frame, on its big canvas
+    FR.cur = FR.sel; stepFrame(time); render(time);
+  } else {
+    clearScene();
+    for (const f of FR.list) withFrame(f, () => { stepFrame(time); render(time); });
+    FR.cur = FR.sel;
+    postPass(time);
+  }
   portraitTick(dt);
   drawMeter();
   syncScrub();
@@ -2110,16 +2174,32 @@ function frameDrag(e) {
   }
   CT.custom = b; Object.assign(BOX, b);
 }
+// geometry-only peek at another frame (its box and shape), for hit testing
+function withGeom(f, fn) {
+  if (f === FR.sel) return fn();
+  const b = { ...BOX }, fl = CT.fluid; Object.assign(BOX, f.box); CT.fluid = f.fluid;
+  try { return fn(); } finally { Object.assign(BOX, b); CT.fluid = fl; }
+}
+function frameHitAll(e) {
+  for (let i = FR.list.length - 1; i >= 0; i--) { const f = FR.list[i], h = withGeom(f, () => frameHit(e)); if (h) return { ...h, f }; }
+  return null;
+}
+function frameAt(e) {
+  const r = canvas.getBoundingClientRect(), u = (e.clientX - r.left) / r.width, v = 1 - (e.clientY - r.top) / r.height;
+  for (let i = FR.list.length - 1; i >= 0; i--) { const f = FR.list[i]; if (withGeom(f, () => boxSD(u, v)) < 0) return f; }
+  return null;
+}
 canvas.addEventListener("pointerdown", e => {
   setPtr(e); canvas.setPointerCapture(e.pointerId);
-  const hit = e.button === 0 ? frameHit(e) : null;
-  if (hit) { CT.drag = { ...hit, sx: e.clientX, sy: e.clientY, box: { x0: BOX.x0, y0: BOX.y0, x1: BOX.x1, y1: BOX.y1 } }; CT.hotT = 1; return; }
+  const hit = e.button === 0 ? frameHitAll(e) : null;
+  if (hit) { selectFrame(hit.f); FR.hover = hit.f; CT.drag = { ...hit, sx: e.clientX, sy: e.clientY, box: { x0: BOX.x0, y0: BOX.y0, x1: BOX.x1, y1: BOX.y1 } }; CT.hotT = 1; return; }
+  if (!PR.running) { const f = frameAt(e); if (f && f !== FR.sel) selectFrame(f); }
   ptr.down = true; ptr.right = e.button === 2;
 });
 canvas.addEventListener("pointermove", e => {
   setPtr(e);
   if (CT.drag) { frameDrag(e); return; }
-  if (!ptr.down) { const hit = frameHit(e); canvas.style.cursor = hit ? hit.cursor : ""; CT.hotT = hit ? 1 : 0; }
+  if (!ptr.down) { const hit = frameHitAll(e); canvas.style.cursor = hit ? hit.cursor : ""; CT.hotT = hit ? 1 : 0; FR.hover = hit ? hit.f : null; }
 });
 const up = () => { ptr.down = false; ptr.right = false; if (CT.drag) { CT.drag = null; CT.hotT = 0; } };
 canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
@@ -2204,7 +2284,7 @@ function applyPreset(i) {
 function switchMode(m) {
   if (m === S.mode) return;
   if (PR.running) cancelPortrait();
-  S.mode = m; S.flip = false; buildModeUI(); setupMode();
+  S.mode = m; S.flip = false; buildModeUI(); setupMode(); renderFrameList();
 }
 function setPaused(v) { S.paused = v; $("pause").textContent = v ? "Play" : "Pause"; }
 function clearSim() {
@@ -2246,6 +2326,52 @@ $("musicctl").appendChild(slider({ id: "react", label: "Speed & glow response", 
   $("musicctl").appendChild(lab);
 }
 function setFluid(v) { CT.fluid = v; $("fr-straight").setAttribute("aria-pressed", !v); $("fr-fluid").setAttribute("aria-pressed", v); }
+function rebuildAll() {
+  if (!FR.list.length) { setupMode(); return; }
+  saveCtx(FR.sel);
+  for (const f of FR.list) { loadCtx(f); setupMode(); saveCtx(f); }
+  loadCtx(FR.sel);
+}
+function renderFrameList() {
+  const el = $("framelist"); el.innerHTML = "";
+  if (FR.sel) saveCtx(FR.sel);
+  FR.list.forEach(f => {
+    const b = document.createElement("button"); b.className = "chip";
+    b.textContent = `${f.num} · ${SYS_NAME[f.mode]}`; b.setAttribute("aria-pressed", f === FR.sel);
+    b.addEventListener("click", () => selectFrame(f));
+    el.appendChild(b);
+  });
+  $("fradd").disabled = FR.list.length >= FR.max || PR.running; $("frdel").disabled = FR.list.length <= 1 || PR.running;
+}
+function syncFrameUI() { applyPalette(); syncPals(); buildModeUI(); setFluid(CT.fluid); renderFrameList(); }
+function selectFrame(f) {
+  if (!f || f === FR.sel || PR.running) return;
+  saveCtx(FR.sel); loadCtx(f); FR.sel = f;
+  syncFrameUI();
+}
+function addFrame() {
+  if (FR.list.length >= FR.max || PR.running) return;
+  saveCtx(FR.sel);
+  // a new frame: the next system and palette, smaller, placed in turn around the screen
+  const used = FR.list.map(f => f.mode), mode = ["sl", "gs", "pl"].find(m => !used.includes(m)) || ["sl", "gs", "pl"][FR.list.length % 3];
+  const k = FR.list.length, spots = [[0.06, 0.52], [0.36, 0.08], [0.06, 0.08], [0.36, 0.52]], [sx, sy] = spots[k % 4];
+  const f = { num: FR.next++, mode, preset: { sl: 0, gs: 0, pl: -1 }, pal: (FR.sel.pal + k) % PALETTES.length, flip: false, gsScale: P.gs.scale,
+    ping: null, view: null, field: null, pl: { n: 0, m: 0, X: null, Y: null, VX: null, VY: null, T: null, M: null, buf: null },
+    box: { x0: sx, y0: sy, x1: sx + 0.36, y1: sy + 0.4 }, custom: { x0: sx, y0: sy, x1: sx + 0.36, y1: sy + 0.4 }, fluid: false,
+    slAcc: 0, lastAlive: 0, slCheckT: 0, slBuf: null };
+  loadCtx(f); setupMode(); saveCtx(f);
+  FR.list.push(f); FR.sel = f;
+  syncFrameUI();
+}
+function removeFrame() {
+  if (FR.list.length <= 1 || PR.running) return;
+  const f = FR.sel; freeAll();
+  FR.list.splice(FR.list.indexOf(f), 1);
+  const g = FR.list[FR.list.length - 1]; loadCtx(g); FR.sel = g;
+  syncFrameUI();
+}
+$("fradd").addEventListener("click", addFrame);
+$("frdel").addEventListener("click", removeFrame);
 $("fr-straight").addEventListener("click", () => setFluid(false));
 $("fr-fluid").addEventListener("click", () => setFluid(true));
 $("frreset").addEventListener("click", () => { CT.custom = null; updateBox(); });
@@ -2296,6 +2422,7 @@ function syncAllUI() {
 
 syncAllUI();
 sizeCanvas(); setupMode();
+{ const f = { num: FR.next++ }; saveCtx(f); FR.list.push(f); FR.sel = FR.cur = f; renderFrameList(); }
 requestAnimationFrame(frame);
 })();
 </script>
