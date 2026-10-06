@@ -18,16 +18,20 @@ Built by Hugo Mazzali as a generative and interactive art project. It runs entir
 
 All three share one renderer: a heat-map palette, film grain, glow and rim light on a warm near-black background, inside a frame that keeps everything on screen.
 
+## Projector output
+
+**Open output window** opens just the animation (no controls) in a second window. Drag it onto the projector and double-click it for full screen (Esc or double-click again to leave). The controls window keeps a live preview in the same shape, where you can still draw and drag the frame, and keyboard shortcuts work in either window. Keep the controls window open (not minimized) so the animation keeps running. With one screen, **Full screen here** hides the controls and fills the screen (Esc brings them back).
+
+## Frame
+
+Drag the frame's edge to move it, or a corner to resize it (handy for lining it up with a projection surface). **Fluid** hides the frame and replaces the hard wall with a soft, invisible boundary that wobbles and swells with the music: shapes fade out gently as they drift past it and particles are pulled back in, so the system's own shapes form the edge (the line shows faintly only while you hover over it to drag). **Reset frame** puts it back.
+
 ## Music
 
 - **Load a song** (MP3, WAV, M4A) or use the built-in **Demo beat**. Audio is analyzed live in the page; nothing is uploaded anywhere.
 - **Song position**: drag the slider under the track name to jump to any part of a loaded song.
 - **Beats push the shapes around**: each beat sends a shockwave from a random point that shoves and spins nearby shapes. **Beat sensitivity** and **Beat push** tune how much the music moves things.
 - **The song steers the rules**: brightness (treble vs bass) moves the feed rate and blends the colors, and loudness changes pattern scale and hue. Steering is gentle in soft passages and strong in full ones.
-
-## Record a clip
-
-Pick a clip length (10, 15, 30 or 45 seconds), then click **Record clip** (or press `V`) to record the animation together with the music, without the control panel. Clips save as MP4 (H.264) where the browser supports it, otherwise WebM.
 
 ## Song portrait
 
@@ -38,8 +42,6 @@ Load a song and choose **Make song portrait**. The page:
 3. Plays the song once on one large canvas that grows outward from the center. Each part grows its system in the space the growth front opens up, and when the song moves on, that part settles: it keeps swaying very slightly with the music while the next part grows around it. Nothing is cycled away: the canvas only gets added to.
 4. Saves the finished canvas as one landscape image (3600 px wide), with a timeline of the parts underneath.
 
-A **Grid of moments** style is also available.
-
 ## Controls
 
 | Key | Action |
@@ -49,11 +51,10 @@ A **Grid of moments** style is also available.
 | `C` | Clear |
 | `Space` | Pause |
 | `M` | Music on/off |
-| `V` | Record a clip (10, 15, 30 or 45 s) |
+| `F` | Fluid / straight frame |
 | `H` | Hide the control panel |
-| Drag | Seed / push (hold `Shift` to erase / pull) |
+| Drag | Seed / push (hold `Shift` to erase / pull); drag the frame edge to move it, a corner to resize |
 
-**Defaults → Save as default** remembers your current settings in your browser.
 
 ## Credits
 

@@ -86,6 +86,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; height:
 .portrait { display: flex; flex-direction: column; gap: 9px; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
 .portrait h2 { margin: 0; }
 .note { color: var(--muted); margin: 0; line-height: 1.5; }
+.framenote { margin: 8px 0; }
+.btn.wide { width: 100%; }
+.actions.two { grid-template-columns: 1fr 1fr; }
+.outnote { margin-top: 8px; }
+body.outmode #c { inset: auto; outline: 1px solid var(--line); }
 #prog { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 16px); left: 50%; transform: translateX(-50%); width: min(440px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; }
 #prog[hidden] { display: none !important; }
 .prow { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-variant-numeric: tabular-nums; }
@@ -97,24 +102,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; height:
 .steer b i { display: block; height: 100%; width: 50%; background: var(--text); opacity: .8; }
 #result { position: fixed; inset: 0; background: rgba(12, 10, 11, 0.86); display: grid; place-items: center; padding: 24px 16px; }
 #result[hidden] { display: none !important; }
-.btn.rec { width: 100%; margin-bottom: 12px; }
-.reclen { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-.reclen .chips { gap: 5px; }
-.reclen .chip { padding: 4px 9px; }
-.btn.rec.on { background: #c8323c; border-color: #c8323c; color: #fff; }
-#recbadge { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-variant-numeric: tabular-nums; }
-#recbadge i { width: 9px; height: 9px; border-radius: 50%; background: #e0414b; animation: recblink 1s steps(2) infinite; }
-@keyframes recblink { 50% { opacity: .25; } }
-@media (prefers-reduced-motion: reduce) { #recbadge i { animation: none; } }
-#clip { position: fixed; inset: 0; background: rgba(12, 10, 11, 0.86); display: grid; place-items: center; padding: 24px 16px; }
-#clip[hidden], #recbadge[hidden] { display: none !important; }
-#clipvid { max-width: 100%; max-height: calc(100vh - 150px); border: 1px solid var(--line); background: #000; }
 .rcard { display: flex; flex-direction: column; gap: 12px; max-width: 100%; max-height: 100%; align-items: center; }
 #resimg { max-width: 100%; max-height: calc(100vh - 150px); object-fit: contain; border: 1px solid var(--line); background: var(--ink); }
 .ractions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .ractions p { color: var(--muted); margin: 0 6px 0 0; max-width: 46ch; }
 .ractions .btn { padding: 8px 14px; }
-#defbox { width: 100%; height: 70px; margin-top: 8px; background: var(--ink); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; font: 400 10.5px var(--mono); padding: 6px; resize: vertical; }
 .keys { color: var(--muted); line-height: 1.7; margin: 0; }
 .keys kbd { font: 500 10.5px var(--mono); border: 1px solid var(--line); border-radius: 2px; padding: 0 4px; color: var(--text); }
 .iconbtn { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 3px; font: 500 10.5px var(--mono); padding: 4px 7px; cursor: pointer; flex: none; }
@@ -144,6 +136,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     </div>
     <button class="iconbtn" id="hide" title="Hide controls (H)">Hide</button>
   </div>
+
+  <section>
+    <h2>Output</h2>
+    <div class="actions two">
+      <button class="btn primary" id="outbtn">Open output window</button>
+      <button class="btn" id="fsbtn">Full screen here</button>
+    </div>
+    <p class="note outnote" id="outnote">Opens just the animation in its own window. Drag that window onto the projector and double-click it for full screen. Keep this controls window open.</p>
+  </section>
 
   <section>
     <div class="tabs" role="tablist" id="tabs"></div>
@@ -179,17 +180,20 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
       <input type="range" id="songpos" min="0" max="1" step="0.1" value="0">
     </div>
     <canvas id="meter" aria-hidden="true"></canvas>
-    <div class="reclen"><span>Clip length</span><div class="chips" id="reclen"></div></div>
-    <button class="btn rec" id="recbtn">● Record clip (10 s)</button>
     <div id="musicctl"></div>
     <div class="portrait">
       <h2>Song portrait</h2>
       <p class="note" id="pnote"></p>
-      <div class="chips" id="pstyle"></div>
       <label class="toggle"><input type="checkbox" id="autodir" checked> <span>Let the song choose the system and presets</span></label>
-      <div class="chips" id="framechips"></div>
       <button class="btn primary" id="portrait" disabled>Make song portrait</button>
     </div>
+  </section>
+
+  <section>
+    <h2>Frame</h2>
+    <div class="brushrow" id="frameshape"><button id="fr-straight">Straight</button><button id="fr-fluid">Fluid</button></div>
+    <p class="note framenote">Drag the frame's edge to move it, or a corner to resize it.</p>
+    <button class="btn wide" id="frreset">Reset frame</button>
   </section>
 
   <section>
@@ -204,17 +208,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
     <button class="btn" id="pause">Pause</button>
     <button class="btn" id="clear">Clear</button>
   </div>
-  <section>
-    <h2>Defaults</h2>
-    <div class="actions">
-      <button class="btn" id="savedef">Save as default</button>
-      <button class="btn" id="copydef">Copy settings</button>
-      <button class="btn" id="resetdef">Reset</button>
-    </div>
-    <p class="note" id="defnote">Save as default makes the page open with your current settings in this browser.</p>
-    <textarea id="defbox" readonly hidden aria-label="Settings to copy"></textarea>
-  </section>
-  <p class="keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch system · <kbd>R</kbd> reseed · <kbd>Space</kbd> pause · <kbd>M</kbd> music on/off · <kbd>V</kbd> record clip · <kbd>H</kbd> hide panel · hold <kbd>Shift</kbd> to flip the brush</p>
+  <p class="keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch system · <kbd>R</kbd> reseed · <kbd>Space</kbd> pause · <kbd>M</kbd> music on/off · <kbd>F</kbd> fluid frame · <kbd>H</kbd> hide panel · hold <kbd>Shift</kbd> to flip the brush</p>
 </aside>
 <button id="show" hidden>Show controls</button>
 <div id="hint"></div>
@@ -225,17 +219,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   <div class="pbar"><i id="pbarfill"></i></div>
   <div class="steer"><span>Energy</span><b><i id="steerE"></i></b><span>Brightness</span><b><i id="steerC"></i></b></div>
   <div class="swatch" id="swatch"></div>
-</div>
-<div id="recbadge" hidden><i></i><span id="rectime">REC 0.0 s</span></div>
-<div id="clip" hidden role="dialog" aria-label="Recorded clip">
-  <div class="rcard">
-    <video id="clipvid" controls playsinline loop></video>
-    <div class="ractions">
-      <p id="clipnote"></p>
-      <button class="btn primary" id="clipsave">Save clip</button>
-      <button class="btn" id="clipclose">Close</button>
-    </div>
-  </div>
 </div>
 <div id="result" hidden role="dialog" aria-label="Song portrait">
   <div class="rcard">
@@ -376,7 +359,21 @@ uniform float uB1, uB2, uD1, uD2, uTime, uAspect;
 uniform vec4 uBrush; uniform vec4 uBox;
 uniform int uGrow; uniform sampler2D uTau; uniform float uPF, uPN;
 out vec4 o;
-bool outside(ivec2 p){ vec2 uv = (vec2(p) + 0.5) / vec2(uSize); vec2 m = 2.0 / vec2(uSize); return uv.x < uBox.x + m.x || uv.x > uBox.z - m.x || uv.y < uBox.y + m.y || uv.y > uBox.w - m.y; }
+
+// container shape: a rounded box, or (fluid) a soft blob whose edge wobbles with the music. Units: screen heights.
+uniform float uFluid, uFT, uFA;
+float boxSD(vec2 uv, float asp){
+  vec2 p = vec2(uv.x * asp, uv.y), lo = vec2(uBox.x * asp, uBox.y), hi = vec2(uBox.z * asp, uBox.w);
+  vec2 c = (lo + hi) * 0.5, h = (hi - lo) * 0.5, q = p - c;
+  float mh = min(h.x, h.y), r = mix(0.011, 0.3 * mh, uFluid);
+  vec2 d = abs(q) - h + r; float sd = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
+  if (uFluid > 0.5) { float a = atan(q.y, q.x);
+    sd += (sin(3.0 * a + uFT * 0.7) * 0.5 + sin(5.0 * a - uFT * 1.1 + 1.3) * 0.3 + sin(2.0 * a + uFT * 0.45 + 2.1) * 0.4 + 0.6) * uFA * mh; }
+  return sd;
+}
+bool outside(ivec2 p){ vec2 uv = (vec2(p) + 0.5) / vec2(uSize); vec2 m = 2.0 / vec2(uSize);
+  if (uFluid > 0.5) return false;   // fluid frame: no hard wall, shapes fade out softly instead
+  return uv.x < uBox.x + m.x || uv.x > uBox.z - m.x || uv.y < uBox.y + m.y || uv.y > uBox.w - m.y; }
 float s1(float x, float a, float al){ return 1.0 / (1.0 + exp(-(x - a) * 4.0 / al)); }
 void main(){
   ivec2 p = ivec2(gl_FragCoord.xy);
@@ -409,6 +406,7 @@ void main(){
     if (length(d * vec2(uAspect, 1.0)) < uBrush.z) a = uBrush.w > 0.0 ? 1.0 : 0.0;
   }
   if (outside(p)) a = 0.0;
+  if (uFluid > 0.5) a *= 1.0 - smoothstep(-0.03, 0.012, boxSD((vec2(p) + 0.5) / vec2(uSize), uAspect));
   o = vec4(a, 0.0, 0.0, 1.0);
 }`;
 
@@ -418,7 +416,21 @@ uniform float uF, uK, uTime, uAspect;
 uniform vec4 uBrush; uniform vec4 uBox;
 uniform int uGrow; uniform sampler2D uTau; uniform float uPF, uPN;
 out vec4 o;
-bool outside(ivec2 p){ vec2 uv = (vec2(p) + 0.5) / vec2(uSize); vec2 m = 2.0 / vec2(uSize); return uv.x < uBox.x + m.x || uv.x > uBox.z - m.x || uv.y < uBox.y + m.y || uv.y > uBox.w - m.y; }
+
+// container shape: a rounded box, or (fluid) a soft blob whose edge wobbles with the music. Units: screen heights.
+uniform float uFluid, uFT, uFA;
+float boxSD(vec2 uv, float asp){
+  vec2 p = vec2(uv.x * asp, uv.y), lo = vec2(uBox.x * asp, uBox.y), hi = vec2(uBox.z * asp, uBox.w);
+  vec2 c = (lo + hi) * 0.5, h = (hi - lo) * 0.5, q = p - c;
+  float mh = min(h.x, h.y), r = mix(0.011, 0.3 * mh, uFluid);
+  vec2 d = abs(q) - h + r; float sd = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
+  if (uFluid > 0.5) { float a = atan(q.y, q.x);
+    sd += (sin(3.0 * a + uFT * 0.7) * 0.5 + sin(5.0 * a - uFT * 1.1 + 1.3) * 0.3 + sin(2.0 * a + uFT * 0.45 + 2.1) * 0.4 + 0.6) * uFA * mh; }
+  return sd;
+}
+bool outside(ivec2 p){ vec2 uv = (vec2(p) + 0.5) / vec2(uSize); vec2 m = 2.0 / vec2(uSize);
+  if (uFluid > 0.5) return false;   // fluid frame: no hard wall, shapes fade out softly instead
+  return uv.x < uBox.x + m.x || uv.x > uBox.z - m.x || uv.y < uBox.y + m.y || uv.y > uBox.w - m.y; }
 vec2 S(ivec2 q){ return texelFetch(uState, (q + uSize) % uSize, 0).rg; }
 // growing canvas: frozen parts and the canvas edge are closed walls (nothing flows in or out), so no solid rim forms along them
 vec2 N(ivec2 q, vec2 c){ vec2 g = (vec2(q) + 0.5) / vec2(uSize); if (outside(q) || texture(uTau, g).r < uPF) return c; return S(q); }
@@ -448,6 +460,7 @@ void main(){
     }
   }
   if (outside(p)) { a = 1.0; b = 0.0; }
+  if (uFluid > 0.5) { float w = smoothstep(-0.03, 0.012, boxSD((vec2(p) + 0.5) / vec2(uSize), uAspect)); b -= b * w * 0.12; a += (1.0 - a) * w * 0.06; }
   o = vec4(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0), 0.0, 1.0);
 }`;
 
@@ -515,7 +528,19 @@ const FS_DISPLAY = HDR + HASH + `
 uniform sampler2D uView; uniform vec2 uRes; uniform float uTime;
 uniform vec3 uPal[6]; uniform vec3 uBg;
 uniform float uGrain, uGlow, uEdge, uSoft, uTilt, uRim, uDrift, uHueMix, uGrainAnim, uDepth, uBoxOn;
-uniform vec4 uBox; uniform float uShift;
+uniform vec4 uBox; uniform float uShift, uHot;
+
+// container shape: a rounded box, or (fluid) a soft blob whose edge wobbles with the music. Units: screen heights.
+uniform float uFluid, uFT, uFA;
+float boxSD(vec2 uv, float asp){
+  vec2 p = vec2(uv.x * asp, uv.y), lo = vec2(uBox.x * asp, uBox.y), hi = vec2(uBox.z * asp, uBox.w);
+  vec2 c = (lo + hi) * 0.5, h = (hi - lo) * 0.5, q = p - c;
+  float mh = min(h.x, h.y), r = mix(0.011, 0.3 * mh, uFluid);
+  vec2 d = abs(q) - h + r; float sd = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
+  if (uFluid > 0.5) { float a = atan(q.y, q.x);
+    sd += (sin(3.0 * a + uFT * 0.7) * 0.5 + sin(5.0 * a - uFT * 1.1 + 1.3) * 0.3 + sin(2.0 * a + uFT * 0.45 + 2.1) * 0.4 + 0.6) * uFA * mh; }
+  return sd;
+}
 out vec4 o;
 vec3 pal(float t){
   t = clamp(t, 0.0, 1.0) * 5.0; int i = int(min(floor(t), 4.0)); float f = t - float(i);
@@ -578,16 +603,12 @@ void main(){
   c *= dim;
   if (uBoxOn > 0.5) {
     // thin rounded frame around the particle container
-    vec2 px = gl_FragCoord.xy;
-    vec2 lo = uBox.xy * uRes, hi2 = uBox.zw * uRes;
-    vec2 ctr = (lo + hi2) * 0.5, hsz = (hi2 - lo) * 0.5;
-    float rad = 10.0 * uRes.y / 900.0;
-    vec2 q2 = abs(px - ctr) - hsz + rad;
-    float sd = length(max(q2, 0.0)) + min(max(q2.x, q2.y), 0.0) - rad;
-    float lw = max(1.0, uRes.y / 700.0);
+    float sd = boxSD(uv, uRes.x / uRes.y) * uRes.y;   // pixels from the frame line
+    float lw = max(1.0, uRes.y / 700.0) * (1.0 + uHot);
     float line = 1.0 - smoothstep(lw * 0.5, lw * 0.5 + 1.0, abs(sd));
-    c *= 1.0 - 0.18 * smoothstep(0.0, 2.0, sd);
-    c = mix(c, vec3(0.95, 0.9, 0.84), line * 0.38);
+    float vis = uFluid > 0.5 ? 0.0 : 1.0;
+    c *= 1.0 - 0.18 * smoothstep(0.0, 2.0, sd) * vis;
+    c = mix(c, vec3(0.95, 0.9, 0.84), line * (0.38 * vis + 0.45 * uHot));
   }
 
   float g = hash(gl_FragCoord.xy + fract(uTime * 7.13 * uGrainAnim) * vec2(97.1, 61.7)) - 0.5;
@@ -922,14 +943,36 @@ function plRules(kind) {
   }
   if (kind === "sym") for (let i = 0; i < m; i++) for (let j = 0; j < i; j++) PL.M[i * m + j] = PL.M[j * m + i];
 }
-/* container box: the open area of the screen not covered by the controls, with a margin */
+/* container box: the open area of the screen not covered by the controls, with a margin,
+   unless the frame has been dragged somewhere by hand */
 const BOX = { x0: 0, y0: 0, x1: 1, y1: 1 }; // uv units, y up
+const CT = { fluid: false, t: 0, A: 0, custom: null, hot: 0, hotT: 0, drag: null };
+function ctOn() { return CT.fluid && !GR.on; }
+function ctUniforms(u) { gl.uniform1f(u.uFluid, ctOn() ? 1 : 0); gl.uniform1f(u.uFT, CT.t); gl.uniform1f(u.uFA, CT.A); }
+// same shape as boxSD in the shaders, in screen heights (negative inside)
+function boxSD(u, v) {
+  const A = aspect, qx = u * A - (BOX.x0 + BOX.x1) * 0.5 * A, qy = v - (BOX.y0 + BOX.y1) * 0.5;
+  const hw = (BOX.x1 - BOX.x0) * 0.5 * A, hh = (BOX.y1 - BOX.y0) * 0.5, mh = Math.min(hw, hh), f = ctOn() ? 1 : 0;
+  const r = 0.011 + (0.3 * mh - 0.011) * f, dx = Math.abs(qx) - hw + r, dy = Math.abs(qy) - hh + r;
+  let sd = Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - r;
+  if (f) { const a = Math.atan2(qy, qx); sd += (Math.sin(3 * a + CT.t * 0.7) * 0.5 + Math.sin(5 * a - CT.t * 1.1 + 1.3) * 0.3 + Math.sin(2 * a + CT.t * 0.45 + 2.1) * 0.4 + 0.6) * CT.A * mh; }
+  return sd;
+}
+// the fluid edge drifts on its own and swells and quickens with the music
+function ctUpdate(dt) {
+  const R = aR();
+  CT.t += dt * (0.5 + AU.level * 1.8 * R);
+  const tgt = 0.1 + Math.min(0.12, AU.bass * 0.14 * R + (AU.beatHit ? 0.05 * R : 0));
+  CT.A += (tgt - CT.A) * (1 - Math.exp(-dt / 0.35));
+  CT.hot += ((CT.hotT ? 1 : 0) - CT.hot) * (1 - Math.exp(-dt / 0.08));
+}
 function updateBox() {
   if (PR.running) return;
+  if (CT.custom) { Object.assign(BOX, CT.custom); return; }
   const vw = canvas.clientWidth, vh = canvas.clientHeight, m = Math.max(24, Math.min(56, Math.min(vw, vh) * 0.06));
   let L = m, R = vw - m, T = m, B = vh - m;
   const pan = document.getElementById("panel");
-  if (!pan.hidden) {
+  if (!pan.hidden && !outActive()) {
     const r = pan.getBoundingClientRect();
     if (r.top > vh * 0.3) B = Math.min(B, r.top - m * 0.6);   // bottom sheet on phones
     else R = Math.min(R, r.left - m * 0.6);                  // side rail on desktop
@@ -1027,6 +1070,16 @@ function plStep() {
   }
   for (let i = 0; i < n; i++) {
     let x = X[i] + VX[i] * dt, y = Y[i] + VY[i] * dt;
+    if (ctOn()) { // fluid frame: a soft spring pulls particles back in, so the crowd of blobs itself forms the edge
+      const sd = boxSD(x / W, y), lim = -inset * 1.3;
+      if (sd > lim) {
+        const e = 0.004, gx = (boxSD((x + e) / W, y) - boxSD((x - e) / W, y)) / (2 * e), gy = (boxSD(x / W, y + e) - boxSD(x / W, y - e)) / (2 * e);
+        const k = Math.min(0.06, sd - lim) * 18;
+        VX[i] = VX[i] * 0.92 - gx * k; VY[i] = VY[i] * 0.92 - gy * k;
+      }
+      X[i] = Math.min(Math.max(x, 0.002), W - 0.002); Y[i] = Math.min(Math.max(y, 0.002), 0.998);
+      continue;
+    }
     // bounce off the container walls, inset so the blobs stay inside the drawn frame
     if (x < wx0) { x = wx0 + (wx0 - x); VX[i] = Math.abs(VX[i]) * 0.6; } else if (x > wx1) { x = wx1 - (x - wx1); VX[i] = -Math.abs(VX[i]) * 0.6; }
     if (y < wy0) { y = wy0 + (wy0 - y); VY[i] = Math.abs(VY[i]) * 0.6; } else if (y > wy1) { y = wy1 - (y - wy1); VY[i] = -Math.abs(VY[i]) * 0.6; }
@@ -1072,7 +1125,7 @@ function stepSL(time) {
     bindTex(0, ping[0]); gl.uniform1i(u.uState, 0);
     gl.uniform2i(u.uSize, ping[0].w, ping[0].h); gl.uniform1i(u.uRa, slRa());
     gl.uniform1f(u.uB1, P.sl.b1); gl.uniform1f(u.uB2, P.sl.b2); gl.uniform1f(u.uD1, P.sl.d1); gl.uniform1f(u.uD2, slD2());
-    gl.uniform1f(u.uAspect, aspect); gl.uniform4fv(u.uBrush, b); gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1);
+    gl.uniform1f(u.uAspect, aspect); gl.uniform4fv(u.uBrush, b); gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1); ctUniforms(u);
     drawQuad(ping[1]); ping.reverse();
   }
 }
@@ -1087,7 +1140,7 @@ function stepGS() {
   gl.useProgram(progGS.p); const u = progGS.u;
   growSimUniforms(u);
   gl.uniform2i(u.uSize, ping[0].w, ping[0].h);
-  const fk = gsFK(); gl.uniform1f(u.uF, fk[0]); gl.uniform1f(u.uK, fk[1]); gl.uniform1f(u.uAspect, aspect); gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1);
+  const fk = gsFK(); gl.uniform1f(u.uF, fk[0]); gl.uniform1f(u.uK, fk[1]); gl.uniform1f(u.uAspect, aspect); gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1); ctUniforms(u);
   for (let i = 0; i < iters; i++) {
     bindTex(0, ping[0]); gl.uniform1i(u.uState, 0);
     gl.uniform4fv(u.uBrush, i === 0 ? b : [0, 0, 0, 0]);
@@ -1148,7 +1201,7 @@ function render(time) {
   gl.uniform1f(u.uHueMix, S.mode === "pl" ? 0.8 : 0.0);
   gl.uniform1f(u.uDepth, S.mode === "sl" ? 1.0 : S.mode === "gs" ? 0.6 : 0.0);
   gl.uniform1f(u.uBoxOn, 1.0);
-  gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1);
+  gl.uniform4f(u.uBox, BOX.x0, BOX.y0, BOX.x1, BOX.y1); ctUniforms(u); gl.uniform1f(u.uHot, CT.hot);
   gl.uniform1f(u.uGrainAnim, reduceMotion ? 0.0 : 1.0);
   drawQuad(null);
 }
@@ -1156,9 +1209,9 @@ function render(time) {
 /* ---------------- sizing + loop ---------------- */
 let rebuildTimer = 0, lastW = 0, lastH = 0;
 function sizeCanvas() {
-  // portraits render at higher resolution so the saved image is large and sharp
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  const w = Math.max(64, Math.floor(canvas.clientWidth * dpr)), h = Math.max(64, Math.floor(canvas.clientHeight * dpr));
+  let w = Math.max(64, Math.floor(canvas.clientWidth * dpr)), h = Math.max(64, Math.floor(canvas.clientHeight * dpr));
+  if (outActive()) { layoutPreview(); w = OUT.w; h = OUT.h; }
   if (w !== lastW || h !== lastH) {
     lastW = w; lastH = h; canvas.width = w; canvas.height = h;
     return true;
@@ -1169,6 +1222,78 @@ window.addEventListener("resize", () => {
   clearTimeout(rebuildTimer);
   rebuildTimer = setTimeout(() => { if (sizeCanvas() && !GR.on) setupMode(); }, 180);
 });
+
+/* ---------------- output window (for a projector) ----------------
+   A second window shows only the animation (a live video of this canvas, so nothing has to be drawn twice).
+   While it's open, the canvas renders at the output window's size and this window shows a same-shaped preview
+   that you can still draw on and drag the frame in. */
+const OUT = { win: null, video: null, w: 0, h: 0, poll: 0, stream: null };
+function outActive() { return !!(OUT.win && !OUT.win.closed); }
+function layoutPreview() {
+  const vw = window.innerWidth, vh = window.innerHeight, m = 20;
+  let L = m, R = vw - m, T = m, B = vh - m;
+  const pan = document.getElementById("panel");
+  if (!pan.hidden) { const r = pan.getBoundingClientRect(); if (r.top > vh * 0.3) B = Math.min(B, r.top - m); else R = Math.min(R, r.left - m); }
+  let w = Math.max(80, R - L), h = Math.max(60, B - T); const a = OUT.w / OUT.h;
+  if (w / h > a) { const nw = h * a; L += (w - nw) / 2; w = nw; } else { const nh = w / a; T += (h - nh) / 2; h = nh; }
+  Object.assign(canvas.style, { left: L + "px", top: T + "px", width: w + "px", height: h + "px" });
+}
+function outMeasure() {
+  const W = OUT.win, d = Math.min(W.devicePixelRatio || 1, 1.5);
+  let w = Math.round((W.innerWidth || 1280) * d), h = Math.round((W.innerHeight || 720) * d);
+  const k = Math.min(1, 2560 / w, 1600 / h); OUT.w = Math.max(160, Math.round(w * k)); OUT.h = Math.max(90, Math.round(h * k));
+}
+function outResized() { outMeasure(); clearTimeout(rebuildTimer); rebuildTimer = setTimeout(() => { if (sizeCanvas() && !GR.on) setupMode(); }, 180); }
+function openOutput() {
+  if (outActive()) { OUT.win.focus(); return; }
+  let W = null;
+  try { W = window.open("", "emergence-output", "width=1280,height=720"); } catch (e) { W = null; }
+  if (!W) { $("outnote").textContent = "The browser blocked the new window. Allow pop-ups for this page (or open the GitHub version), then try again. Full screen here also works with one screen."; return; }
+  let stream = null;
+  try { stream = canvas.captureStream(60); } catch (e) { stream = null; }
+  if (!stream) { W.close(); $("outnote").textContent = "This browser can't send the animation to a second window. Use Full screen here instead."; return; }
+  const doc = W.document;
+  doc.open();
+  doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Emergence Studies · output</title><style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block}
+#tip{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);font:500 13px ui-monospace,Consolas,monospace;color:#f1e7dc;background:rgba(29,24,27,.88);border:1px solid #3a3036;border-radius:4px;padding:9px 14px;transition:opacity .6s}
+body.idle{cursor:none} body.idle #tip{opacity:0}
+</style></head><body><video id="v" autoplay muted playsinline></video><div id="tip">Drag this window onto the projector, then double-click for full screen · Esc leaves full screen</div></body></html>`);
+  doc.close();
+  OUT.win = W; OUT.stream = stream;
+  const v = doc.getElementById("v"); OUT.video = v; v.srcObject = stream; const pl = v.play(); if (pl && pl.catch) pl.catch(() => {});
+  const fs = () => { const el = doc.documentElement; if (doc.fullscreenElement) doc.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen().catch(() => {}); };
+  doc.addEventListener("dblclick", fs);
+  let idle = 0; const wake = () => { doc.body.classList.remove("idle"); clearTimeout(idle); idle = setTimeout(() => doc.body.classList.add("idle"), 2500); };
+  doc.addEventListener("mousemove", wake); wake();
+  W.addEventListener("keydown", e => { if (e.key === "Enter") fs(); else onKey(e); });
+  W.addEventListener("keyup", e => { if (e.key === "Shift") ptr.shift = false; });
+  W.addEventListener("resize", outResized);
+  document.body.classList.add("outmode");
+  $("outbtn").textContent = "Close output window";
+  $("outnote").textContent = "Output window open. Drag it onto the projector and double-click it for full screen. This window shows a preview in the same shape; keep it open (not minimized) so the animation keeps running.";
+  outResized();
+  clearInterval(OUT.poll); OUT.poll = setInterval(() => { if (!outActive()) closeOutput(); }, 600);
+}
+function closeOutput() {
+  clearInterval(OUT.poll);
+  if (OUT.win && !OUT.win.closed) OUT.win.close();
+  if (OUT.stream) OUT.stream.getTracks().forEach(t => t.stop());
+  OUT.win = OUT.video = OUT.stream = null;
+  document.body.classList.remove("outmode");
+  ["left", "top", "width", "height"].forEach(k => canvas.style[k] = "");
+  $("outbtn").textContent = "Open output window";
+  $("outnote").textContent = "Opens just the animation in its own window. Drag that window onto the projector and double-click it for full screen. Keep this controls window open.";
+  if (sizeCanvas() && !GR.on) setupMode();
+}
+// one-screen option: full screen this window with the controls hidden (H or Esc brings them back)
+function fullHere() {
+  setPanel(false);
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen().catch(() => { $("outnote").textContent = "Full screen isn't allowed here. Use your browser's own full screen (F11), or open the GitHub version."; });
+}
+window.addEventListener("beforeunload", () => { if (OUT.win && !OUT.win.closed) OUT.win.close(); });
 
 /* ---------------- music ---------------- */
 const music = { react: 1, push: 1, beats: true, sens: 0.5 };
@@ -1182,7 +1307,6 @@ function ensureCtx() {
     AU.ctx = new C();
     AU.an = AU.ctx.createAnalyser(); AU.an.fftSize = 1024; AU.an.smoothingTimeConstant = 0.55;
     AU.out = AU.ctx.createGain(); AU.out.connect(AU.an); AU.an.connect(AU.ctx.destination);
-    try { AU.recDest = AU.ctx.createMediaStreamDestination(); AU.an.connect(AU.recDest); } catch (e) { AU.recDest = null; } // music feed for clip recording
     AU.data = new Uint8Array(AU.an.frequencyBinCount);
   }
   return true;
@@ -1471,37 +1595,12 @@ function steerScale(time) {
    Each frame covers one slice of the song: a long exposure of everything that moved during the slice,
    with a crisp snapshot taken just after the slice's strongest beat laid on top.
    When the sound's character shifts (a new section), the grid starts a new labeled row. */
-const PR = { running: false, ended: false, frames: 16, cells: [], start: 0, dur: 0, mode: "", sections: [0], blob: null, url: null, title: "", style: "grow", timeline: [], saved: null };
+const PR = { running: false, ended: false, start: 0, dur: 0, mode: "", sections: [0], blob: null, url: null, title: "", timeline: [], saved: null };
 const NOV = { eS: 0, eL: 0, cS: 0, cL: 0, bS: 0, bL: 0, mean: 0.02, init: false, last: 0 };
 const fmtTime = t => { t = Math.max(0, Math.round(t)); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); };
-const SAMPLE_DT = 0.05, INK = "#141113";
+const INK = "#141113";
 const secLetter = i => i < 26 ? String.fromCharCode(65 + i) : "S" + (i + 1);
 function newCanvas(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
-function cropRect() {
-  const W = canvas.width, H = canvas.height, ins = Math.round(6 * Math.min(window.devicePixelRatio || 1, 1.5));
-  return { sx: Math.round(BOX.x0 * W) + ins, sy: Math.round((1 - BOX.y1) * H) + ins,
-           sw: Math.round((BOX.x1 - BOX.x0) * W) - 2 * ins, sh: Math.round((BOX.y1 - BOX.y0) * H) - 2 * ins };
-}
-function grabInto(cv, op) {
-  const r = cropRect(), g = cv.getContext("2d");
-  g.globalCompositeOperation = op || "source-over";
-  g.drawImage(canvas, r.sx, r.sy, r.sw, r.sh, 0, 0, cv.width, cv.height);
-  g.globalCompositeOperation = "source-over";
-}
-function makeCell(i) {
-  const r = cropRect(), w = Math.min(r.sw, 900), h = Math.round(w * r.sh / r.sw);
-  const acc = newCanvas(w, h), g = acc.getContext("2d"); g.fillStyle = INK; g.fillRect(0, 0, w, h);
-  const win = PR.dur / PR.frames, expected = Math.max(4, win / SAMPLE_DT);
-  // fade per sample so the oldest trail in the slice ends at about a fifth of full strength
-  return { i, acc, peak: null, best: -1, pending: -1, peakT: (i + 0.5) * win, lastSample: -1, fade: 1 - Math.pow(0.22, 1 / expected) };
-}
-function sampleTrail(c, el) {
-  const g = c.acc.getContext("2d");
-  g.globalAlpha = c.fade; g.fillStyle = INK; g.fillRect(0, 0, c.acc.width, c.acc.height); g.globalAlpha = 1;
-  grabInto(c.acc, "lighten");
-  c.lastSample = el;
-}
-function snapPeak(c, t) { if (!c.peak) c.peak = newCanvas(c.acc.width, c.acc.height); grabInto(c.peak); c.peakT = t; }
 // section detection: compare the last ~1.5 s of sound with the last ~8 s; a big gap means the song changed character
 function noveltyUpdate(dt, el) {
   const e = SG.eRaw || 0, c = SG.cRaw || 0, b = AU.level > 0.02 ? Math.min(1, AU.bass / (AU.level * 2)) : 0;
@@ -1512,7 +1611,7 @@ function noveltyUpdate(dt, el) {
   NOV.bS += (b - NOV.bS) * ks; NOV.bL += (b - NOV.bL) * kl;
   const nov = Math.abs(NOV.eS - NOV.eL) * 1.5 + Math.abs(NOV.cS - NOV.cL) + Math.abs(NOV.bS - NOV.bL) * 0.5;
   NOV.mean += (nov - NOV.mean) * (1 - Math.exp(-dt / 20));
-  const minGap = Math.max(8, 3 * PR.dur / PR.frames);
+  const minGap = Math.max(8, PR.dur / 5);
   if (el - NOV.last > minGap && el > 4 && PR.dur - el > minGap * 0.5 && nov > Math.max(0.09, NOV.mean * 3.2)) {
     NOV.last = el; PR.sections.push(Math.max(0, el - 1.2)); // the detector hears a change ~1 s after it starts
     if (PR.running && AD.on) directSystem(el);
@@ -1796,7 +1895,7 @@ function growComposite() {
 function growRect() {
   const vw = canvas.clientWidth || 1, vh = canvas.clientHeight || 1, m = Math.max(20, Math.min(48, Math.min(vw, vh) * 0.05));
   let L = m, R = vw - m, T = m, B = vh - m - 14;
-  const pg = document.getElementById("prog"); if (pg && !pg.hidden) T = Math.max(T, pg.getBoundingClientRect().bottom + m * 0.5);
+  const pg = document.getElementById("prog"); if (pg && !pg.hidden && !outActive()) T = Math.max(T, pg.getBoundingClientRect().bottom + m * 0.5);
   let w = Math.max(40, R - L), h = Math.max(30, B - T);
   if (w / h > GR.aspect) { const nw = h * GR.aspect; L += (w - nw) / 2; w = nw; } else { const nh = w / GR.aspect; T += (h - nh) / 2; h = nh; }
   GR.rect = [L / vw, 1 - (T + h) / vh, (L + w) / vw, 1 - T / vh];
@@ -1882,12 +1981,10 @@ function startPortrait() {
   PR.saved = getSettings();
   setPanel(false); updateBox();
   PR.running = true; PR.dur = AU.buf.duration;
-  if (PR.style === "grow") {
-    GR.on = true; Object.assign(BOX, { x0: 0, y0: 0, x1: 1, y1: 1 });
-    sizeCanvas(); growInit(); growUpdate(0); setupMode();
-  } else { if (sizeCanvas()) setupMode(); seed(); }
+  GR.on = true; Object.assign(BOX, { x0: 0, y0: 0, x1: 1, y1: 1 });
+  sizeCanvas(); growInit(); growUpdate(0); setupMode();
   IMP.length = 0; toss[0] = toss[1] = 0;
-  PR.running = true; PR.ended = false; PR.cells = []; PR.sections = [0]; PR.mode = S.mode;
+  PR.running = true; PR.ended = false; PR.sections = [0]; PR.mode = S.mode;
   PR.timeline = [{ t: 0, sys: S.mode, preset: (MODES[S.mode].presets[S.preset[S.mode]] || { name: "Custom" }).name }];
   AD.beats = []; PR.lastChange = -10; PR.nextSeg = 1; PR.plan = null;
   Object.assign(NOV, { mean: 0.02, init: false, last: 0 });
@@ -1906,31 +2003,19 @@ function startPortrait() {
   $("prog").hidden = false;
 }
 function cancelPortrait() {
-  PR.running = false; PR.ended = false; PR.cells = [];
+  PR.running = false; PR.ended = false;
   stopSources(); AU.playing = false; $("prog").hidden = true;
   setTrack("Portrait cancelled. " + AU.name + " is still loaded.", false); syncPlay();
   restoreAfterPortrait();
 }
 function portraitTick(dt) {
   if (!PR.running) return;
-  const el = Math.min(PR.dur, AU.ctx.currentTime - PR.start), win = PR.dur / PR.frames;
+  const el = Math.min(PR.dur, AU.ctx.currentTime - PR.start);
   if (AU.beatHit) { AD.beats.push(el); if (AD.beats.length > 64) AD.beats.shift(); }
   if (GR.on) growUpdate(el);
   // planned system changes from the song analysis
   while (AD.on && PR.plan && PR.nextSeg < PR.plan.length && el >= PR.plan[PR.nextSeg].t0) {
     const g = PR.plan[PR.nextSeg++]; applyStyle(g.t0, g.sys, g.preset);
-  }
-  if (!GR.on) {
-    const idx = Math.min(PR.frames - 1, Math.floor(el / win));
-    for (let i = 0; i <= idx; i++) if (!PR.cells[i]) PR.cells[i] = makeCell(i);
-    const c = PR.cells[idx];
-    if (el - c.lastSample >= SAMPLE_DT) sampleTrail(c, el);
-    if (AU.beatHit && (AU.beatStr || 0) > c.best) { c.best = AU.beatStr || 0; c.pending = el + 0.15; }
-    for (let i = Math.max(0, idx - 1); i <= idx; i++) {
-      const ci = PR.cells[i];
-      if (ci.pending > 0 && el >= ci.pending) { snapPeak(ci, ci.pending - 0.15); ci.pending = -1; }
-    }
-    if (idx > 0) { const pv = PR.cells[idx - 1]; if (!pv.peak && pv.pending < 0) snapPeak(pv, idx * win); }
   }
   if (!PR.plan) noveltyUpdate(dt, el);
   const nowSys = PR.timeline.length ? PR.timeline[PR.timeline.length - 1] : null;
@@ -1939,161 +2024,8 @@ function portraitTick(dt) {
   $("steerE").style.width = (SG.E * 100).toFixed(0) + "%"; $("steerC").style.width = (SG.C * 100).toFixed(0) + "%";
   { const st = []; for (let i = 0; i < 6; i++) st.push(`rgb(${palFlat.slice(i * 3, i * 3 + 3).map(v => Math.round(v * 255)).join(",")})`); $("swatch").style.background = `linear-gradient(90deg, ${st.join(", ")})`; }
   if (PR.ended || el >= PR.dur - 0.03) {
-    if (GR.on) finishGrow();
-    else {
-      for (let i = 0; i < PR.frames; i++) {
-        if (!PR.cells[i]) PR.cells[i] = makeCell(i);
-        const ci = PR.cells[i]; if (!ci.peak) snapPeak(ci, Math.min(PR.dur, (i + 1) * win));
-      }
-      finishPortrait();
-    }
+    finishGrow();
     restoreAfterPortrait();
-  }
-}
-async function finishPortrait() {
-  PR.running = false; PR.ended = false; AU.playing = false;
-  stopSources(); $("prog").hidden = true; syncPlay();
-  setTrack("Portrait finished: " + AU.name, false);
-  try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
-  const cells = PR.cells.filter(Boolean), n = cells.length; if (!n) return;
-  const win = PR.dur / PR.frames;
-  // tile = faded long exposure underneath, crisp peak snapshot on top
-  const tiles = cells.map(c => {
-    const t = newCanvas(c.acc.width, c.acc.height), g = t.getContext("2d");
-    g.fillStyle = INK; g.fillRect(0, 0, t.width, t.height);
-    g.globalAlpha = 0.62; g.drawImage(c.acc, 0, 0); g.globalAlpha = 1;
-    g.globalCompositeOperation = "lighten"; g.drawImage(c.peak, 0, 0); g.globalCompositeOperation = "source-over";
-    return { c: t, t: c.peakT, mid: (c.i + 0.5) * win };
-  });
-  const secOf = tm => { let k = 0; for (let j = 0; j < PR.sections.length; j++) if (PR.sections[j] <= tm) k = j; return k; };
-  const a = tiles[0].c.width / tiles[0].c.height;
-  let cols = 4, best = 1e9;
-  for (let c = 2; c <= 8; c++) { const r = Math.ceil(n / c), score = Math.abs((c * a) / r - 1.0) + (n % c ? 0.25 : 0); if (score < best) { best = score; cols = c; } }
-  // rows: a new section always starts a new row
-  const rows = [];
-  tiles.forEach((tl, i) => {
-    const sec = secOf(tl.mid), last = rows[rows.length - 1];
-    if (!last || last.sec !== sec || last.items.length >= cols) rows.push({ sec, starts: !last || last.sec !== sec, items: [], idx0: i });
-    rows[rows.length - 1].items.push(tl);
-  });
-  const nSec = rows.filter(r => r.starts).length;
-  const cw = 560, ch = Math.round(cw / a), gap = Math.round(cw * 0.07), secGap = Math.round(gap * 2.4), mx = Math.round(cw * 0.32);
-  const lw = Math.round(cw * 0.26), head = Math.round(cw * 0.46), lab = Math.round(cw * 0.1), foot = Math.round(cw * 0.22);
-  const rowH = ch + lab;
-  let gridH = 0; rows.forEach((r, k) => { gridH += rowH + (k < rows.length - 1 ? (rows[k + 1].starts ? secGap : gap) : 0); });
-  const W = mx * 2 + lw + cols * cw + (cols - 1) * gap, H = mx + head + gridH + foot + Math.round(mx * 0.5);
-  const out = newCanvas(W, H), g = out.getContext("2d");
-  g.fillStyle = INK; g.fillRect(0, 0, W, H);
-  const cream = "#f1e7dc", muted = "#a9988f", title = AU.name.replace(/\.[^.]+$/, "");
-  g.fillStyle = cream; g.textBaseline = "alphabetic";
-  g.font = `700 ${Math.round(cw * 0.17)}px "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif`;
-  g.fillText(title, mx, mx + Math.round(cw * 0.2), W - mx * 2);
-  g.fillStyle = muted; g.font = `500 ${Math.round(cw * 0.042)}px "IBM Plex Mono", Consolas, monospace`;
-  const usedSys = [...new Set((PR.timeline.length ? PR.timeline : [{ sys: PR.mode }]).map(x => x.sys))];
-  const sysName = usedSys.map(m => ({ sl: "SmoothLife", gs: "Reaction-diffusion", pl: "Particle life" })[m]).join(" + ");
-  g.fillText(`EMERGENCE STUDIES  ·  ${sysName.toUpperCase()}  ·  ${n} MOMENTS  ·  ${nSec} SECTION${nSec === 1 ? "" : "S"}  ·  ${fmtTime(PR.dur)}`, mx, mx + Math.round(cw * 0.32));
-  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
-  let y = mx + head, secTop = y;
-  rows.forEach((r, k) => {
-    if (r.starts) {
-      secTop = y;
-      const st = PR.sections[r.sec] || 0;
-      g.fillStyle = cream; g.font = `700 ${Math.round(cw * 0.13)}px "Bricolage Grotesque", "Avenir Next", sans-serif`;
-      g.fillText(secLetter(r.sec), mx, y + Math.round(cw * 0.12));
-      g.fillStyle = muted; g.font = `400 ${Math.round(cw * 0.038)}px "IBM Plex Mono", Consolas, monospace`;
-      g.fillText(fmtTime(st), mx, y + Math.round(cw * 0.19));
-    }
-    r.items.forEach((tl, j) => {
-      const cx = mx + lw + j * (cw + gap), num = r.idx0 + j + 1;
-      g.drawImage(tl.c, cx, y, cw, ch);
-      g.strokeStyle = "rgba(241,231,220,0.22)"; g.lineWidth = 2; g.strokeRect(cx + 1, y + 1, cw - 2, ch - 2);
-      g.fillStyle = muted; g.font = `400 ${Math.round(cw * 0.04)}px "IBM Plex Mono", Consolas, monospace`;
-      g.textAlign = "left"; g.fillText(fmtTime(tl.t), cx, y + ch + Math.round(lab * 0.68));
-      g.textAlign = "right"; g.fillText(String(num).padStart(2, "0"), cx + cw, y + ch + Math.round(lab * 0.68));
-      g.textAlign = "left";
-    });
-    const endsSection = k === rows.length - 1 || rows[k + 1].starts;
-    if (endsSection) { // thin rule marking the section's span
-      g.fillStyle = "rgba(241,231,220,0.28)"; g.fillRect(mx + 2, secTop + Math.round(cw * 0.24), 2, Math.max(0, y + ch - secTop - Math.round(cw * 0.24)));
-    }
-    y += rowH + (k < rows.length - 1 ? (rows[k + 1].starts ? secGap : gap) : 0);
-  });
-  // film grain over the whole sheet
-  const tile = newCanvas(256, 256), tg = tile.getContext("2d"), id = tg.createImageData(256, 256);
-  for (let i = 0; i < id.data.length; i += 4) { const v = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 20; }
-  tg.putImageData(id, 0, 0); g.fillStyle = g.createPattern(tile, "repeat"); g.fillRect(0, 0, W, H);
-  out.toBlob(blob => {
-    if (!blob) return;
-    if (PR.url) URL.revokeObjectURL(PR.url);
-    PR.blob = blob; PR.url = URL.createObjectURL(blob); PR.title = title;
-    $("resimg").src = PR.url; $("resnote").textContent = `${W} × ${H} px PNG · ${nSec} section${nSec === 1 ? "" : "s"} found`; $("result").hidden = false; $("ressave").focus();
-  }, "image/png");
-}
-/* ---------------- clip recording ----------------
-   Records only the animation canvas (not the panel) plus the music, up to 10 seconds.
-   MP4 where the browser can record it, otherwise WebM; both keep the animation and the sound. */
-const REC = { mr: null, chunks: [], t0: 0, timer: 0, blob: null, url: null, ext: "webm", max: 10 };
-function pickClipType() {
-  // MP4 only with H.264 (plays everywhere); otherwise WebM
-  const types = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1.42E01E,opus", "video/mp4;codecs=avc1,mp4a", "video/mp4;codecs=avc1",
-                 "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
-  for (const t of types) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t; } catch (e) {} }
-  return "";
-}
-function syncRecBtn() {
-  const b = $("recbtn"), on = !!(REC.mr && REC.mr.state === "recording");
-  b.classList.toggle("on", on);
-  b.textContent = on ? `■ Stop recording · ${Math.max(0, REC.max - (performance.now() - REC.t0) / 1000).toFixed(1)} s left` : `● Record clip (${REC.max} s)`;
-  [...$("reclen").children].forEach(c => { c.disabled = on; c.setAttribute("aria-pressed", Number(c.dataset.s) === REC.max); });
-}
-function startClip() {
-  if (!window.MediaRecorder || !canvas.captureStream) { setTrack("This browser can't record video from the page. Try a recent Chrome, Edge or Firefox."); return; }
-  const type = pickClipType();
-  const stream = canvas.captureStream(30);
-  if (AU.recDest && AU.playing) AU.recDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-  let mr;
-  try { mr = new MediaRecorder(stream, { mimeType: type || undefined, videoBitsPerSecond: 12e6, audioBitsPerSecond: 192e3 }); }
-  catch (e) { try { mr = new MediaRecorder(stream); } catch (e2) { setTrack("Recording couldn't start in this browser."); return; } }
-  REC.chunks = []; REC.mr = mr; REC.ext = (mr.mimeType || type).includes("mp4") ? "mp4" : "webm";
-  REC.hadAudio = stream.getAudioTracks().length > 0;
-  mr.ondataavailable = e => { if (e.data && e.data.size) REC.chunks.push(e.data); };
-  mr.onstop = () => {
-    clearInterval(REC.timer); $("recbadge").hidden = true; syncRecBtn();
-    if (!REC.chunks.length) return;
-    REC.blob = new Blob(REC.chunks, { type: mr.mimeType || (REC.ext === "mp4" ? "video/mp4" : "video/webm") });
-    if (REC.url) URL.revokeObjectURL(REC.url);
-    REC.url = URL.createObjectURL(REC.blob);
-    const secs = Math.min(REC.max, (performance.now() - REC.t0) / 1000);
-    $("clipvid").src = REC.url;
-    $("clipnote").textContent = `${secs.toFixed(1)} s · ${REC.ext.toUpperCase()} · ${(REC.blob.size / 1e6).toFixed(1)} MB` + (REC.hadAudio ? " · with music" : " · no music was playing");
-    $("clip").hidden = false; $("clipsave").focus();
-  };
-  mr.start(250);
-  REC.t0 = performance.now();
-  $("recbadge").hidden = false;
-  REC.timer = setInterval(() => {
-    const el = (performance.now() - REC.t0) / 1000;
-    $("rectime").textContent = `REC ${el.toFixed(1)} s / ${REC.max} s`;
-    syncRecBtn();
-    if (el >= REC.max) stopClip();
-  }, 100);
-  syncRecBtn();
-}
-function stopClip() { if (REC.mr && REC.mr.state === "recording") REC.mr.stop(); }
-function toggleClip() { if (REC.mr && REC.mr.state === "recording") stopClip(); else startClip(); }
-async function saveBlob(blob, filename, noteEl) {
-  let dl = null;
-  try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { dl = null; }
-  if (!dl) { // outside Claude: a normal browser download
-    try { const url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); noteEl.textContent = "Downloaded."; }
-    catch (e) { noteEl.textContent = "Couldn't start the download in this browser."; }
-    return;
-  }
-  try { await dl.save({ filename, data: blob }); noteEl.textContent = "Saved."; }
-  catch (e) {
-    if (e && e.code === "declined") return;
-    if (e && e.code === "rate_limited") { noteEl.textContent = "A save prompt is already open."; return; }
-    noteEl.textContent = "Couldn't save the file here.";
   }
 }
 async function savePortrait() {
@@ -2130,6 +2062,7 @@ function frame(ms) {
   motionUpdate(dt);
   steerUpdate(dt);
   steerScale(time);
+  ctUpdate(dt);
   if (!S.paused) {
     if (S.mode === "sl") {
       stepSL(time);
@@ -2154,9 +2087,41 @@ function setPtr(e) {
   const r = canvas.getBoundingClientRect();
   ptr.x = (e.clientX - r.left) / r.width; ptr.y = 1 - (e.clientY - r.top) / r.height; ptr.shift = e.shiftKey;
 }
-canvas.addEventListener("pointerdown", e => { ptr.down = true; ptr.right = e.button === 2; setPtr(e); canvas.setPointerCapture(e.pointerId); });
-canvas.addEventListener("pointermove", e => { setPtr(e); });
-const up = () => { ptr.down = false; ptr.right = false; };
+// what the pointer is over: a frame corner (resize), the frame edge (move), or the inside (brush)
+function frameHit(e) {
+  if (PR.running) return null;
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, W = r.width, H = r.height;
+  const L = BOX.x0 * W, R = BOX.x1 * W, T = (1 - BOX.y1) * H, B = (1 - BOX.y0) * H, cr = 18;
+  for (const [cx, cy, kx, ky] of [[L, T, "x0", "y1"], [R, T, "x1", "y1"], [L, B, "x0", "y0"], [R, B, "x1", "y0"]])
+    if (Math.hypot(x - cx, y - cy) < cr) return { kind: "corner", kx, ky, cursor: (kx === "x0") === (ky === "y1") ? "nwse-resize" : "nesw-resize" };
+  if (Math.abs(boxSD(x / W, 1 - y / H)) * H < 11) return { kind: "move", cursor: "move" };
+  return null;
+}
+function frameDrag(e) {
+  const d = CT.drag, r = canvas.getBoundingClientRect(), W = r.width, H = r.height;
+  const dx = (e.clientX - d.sx) / W, dy = -(e.clientY - d.sy) / H, b = { ...d.box }, minW = 140 / W, minH = 110 / H;
+  if (d.kind === "move") {
+    const w = b.x1 - b.x0, h = b.y1 - b.y0;
+    b.x0 = Math.min(1 - w, Math.max(0, d.box.x0 + dx)); b.y0 = Math.min(1 - h, Math.max(0, d.box.y0 + dy)); b.x1 = b.x0 + w; b.y1 = b.y0 + h;
+  } else {
+    b[d.kx] = Math.min(1, Math.max(0, d.box[d.kx] + dx)); b[d.ky] = Math.min(1, Math.max(0, d.box[d.ky] + dy));
+    if (b.x1 - b.x0 < minW) { if (d.kx === "x0") b.x0 = b.x1 - minW; else b.x1 = b.x0 + minW; }
+    if (b.y1 - b.y0 < minH) { if (d.ky === "y0") b.y0 = b.y1 - minH; else b.y1 = b.y0 + minH; }
+  }
+  CT.custom = b; Object.assign(BOX, b);
+}
+canvas.addEventListener("pointerdown", e => {
+  setPtr(e); canvas.setPointerCapture(e.pointerId);
+  const hit = e.button === 0 ? frameHit(e) : null;
+  if (hit) { CT.drag = { ...hit, sx: e.clientX, sy: e.clientY, box: { x0: BOX.x0, y0: BOX.y0, x1: BOX.x1, y1: BOX.y1 } }; CT.hotT = 1; return; }
+  ptr.down = true; ptr.right = e.button === 2;
+});
+canvas.addEventListener("pointermove", e => {
+  setPtr(e);
+  if (CT.drag) { frameDrag(e); return; }
+  if (!ptr.down) { const hit = frameHit(e); canvas.style.cursor = hit ? hit.cursor : ""; CT.hotT = hit ? 1 : 0; }
+});
+const up = () => { ptr.down = false; ptr.right = false; if (CT.drag) { CT.drag = null; CT.hotT = 0; } };
 canvas.addEventListener("pointerup", up); canvas.addEventListener("pointercancel", up);
 canvas.addEventListener("contextmenu", e => e.preventDefault());
 
@@ -2254,46 +2219,13 @@ $("demo").addEventListener("click", () => { if (PR.running) cancelPortrait(); st
 $("portrait").addEventListener("click", startPortrait);
 $("progcancel").addEventListener("click", cancelPortrait);
 $("ressave").addEventListener("click", savePortrait);
-$("recbtn").addEventListener("click", toggleClip);
-[10, 15, 30, 45].forEach(sec => {
-  const c = document.createElement("button"); c.className = "chip"; c.textContent = sec + " s"; c.dataset.s = sec;
-  c.addEventListener("click", () => { if (REC.mr && REC.mr.state === "recording") return; REC.max = sec; syncRecBtn(); });
-  $("reclen").appendChild(c);
-});
-syncRecBtn();
 // song position: drag to preview the time, release to jump there
 $("songpos").addEventListener("input", () => { scrubbing = true; });
 $("songpos").addEventListener("change", e => { scrubbing = false; seekSong(parseFloat(e.target.value)); });
 $("songpos").addEventListener("blur", () => { scrubbing = false; });
-$("clipclose").addEventListener("click", () => { $("clip").hidden = true; $("clipvid").pause(); });
-$("clipsave").addEventListener("click", () => {
-  if (!REC.blob) return;
-  const base = (AU.name ? AU.name.replace(/\.[^.]+$/, "") : "emergence").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 100) || "emergence";
-  saveBlob(REC.blob, `${base} - ${SYS_NAME[S.mode].toLowerCase()} clip.${REC.ext}`, $("clipnote"));
-});
 $("resclose").addEventListener("click", () => { $("result").hidden = true; setPanel(true); });
-const PNOTES = {
-  grow: "Plays the loaded song once on one large canvas. Each part of the song grows its system outward from the center; earlier parts settle and keep swaying very slightly with the music. The finished canvas is the image.",
-  grid: "Plays the loaded song once and lays out a grid of moments, one row per section of the song."
-};
-function syncPortraitUI() {
-  [...$("pstyle").children].forEach(b => b.setAttribute("aria-pressed", b.dataset.style === PR.style));
-  $("pnote").textContent = PNOTES[PR.style];
-  $("framechips").hidden = PR.style !== "grid";
-}
-[["grow", "Growing canvas"], ["grid", "Grid of moments"]].forEach(([k, label]) => {
-  const b = document.createElement("button"); b.className = "chip"; b.textContent = label; b.dataset.style = k;
-  b.addEventListener("click", () => { if (PR.running) return; PR.style = k; syncPortraitUI(); });
-  $("pstyle").appendChild(b);
-});
+$("pnote").textContent = "Plays the loaded song once on one large canvas. Each part of the song grows its system outward from the center; earlier parts settle and keep swaying very slightly with the music. The finished canvas is the image.";
 $("autodir").addEventListener("change", e => AD.on = e.target.checked);
-syncPortraitUI();
-[12, 16, 24].forEach(nf => {
-  const b = document.createElement("button"); b.className = "chip"; b.textContent = nf + " moments";
-  b.setAttribute("aria-pressed", PR.frames === nf);
-  b.addEventListener("click", () => { PR.frames = nf; [...$("framechips").children].forEach(x => x.setAttribute("aria-pressed", x === b)); });
-  $("framechips").appendChild(b);
-});
 $("play").addEventListener("click", toggleMusic);
 $("musicctl").appendChild(slider({ id: "sens", label: "Beat sensitivity", min: 0, max: 1, step: 0.05, val: 0.5 }, music, null, "music"));
 $("musicctl").appendChild(slider({ id: "push", label: "Beat push", min: 0, max: 3, step: 0.05, val: 1 }, music, null, "music"));
@@ -2313,32 +2245,38 @@ $("musicctl").appendChild(slider({ id: "react", label: "Speed & glow response", 
   lab.querySelector("input").addEventListener("change", e => music.beats = e.target.checked);
   $("musicctl").appendChild(lab);
 }
+function setFluid(v) { CT.fluid = v; $("fr-straight").setAttribute("aria-pressed", !v); $("fr-fluid").setAttribute("aria-pressed", v); }
+$("fr-straight").addEventListener("click", () => setFluid(false));
+$("fr-fluid").addEventListener("click", () => setFluid(true));
+$("frreset").addEventListener("click", () => { CT.custom = null; updateBox(); });
+setFluid(false);
 $("pause").addEventListener("click", () => setPaused(!S.paused));
 $("clear").addEventListener("click", clearSim);
-function setPanel(show) { $("panel").hidden = !show; $("show").hidden = show; updateBox(); }
+function setPanel(show) { $("panel").hidden = !show; $("show").hidden = show; if (outActive()) layoutPreview(); updateBox(); }
+$("outbtn").addEventListener("click", () => outActive() ? closeOutput() : openOutput());
+$("fsbtn").addEventListener("click", fullHere);
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && !outActive()) setPanel(true); });
 $("hide").addEventListener("click", () => setPanel(false));
 $("show").addEventListener("click", () => setPanel(true));
-window.addEventListener("keydown", e => {
+window.addEventListener("keydown", e => onKey(e));
+function onKey(e) {
   if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
   if (e.key === "Shift") ptr.shift = true;
   if (e.key === "1") switchMode("sl"); else if (e.key === "2") switchMode("gs"); else if (e.key === "3") switchMode("pl");
   else if (e.key === "r" || e.key === "R") seed();
   else if (e.key === "c" || e.key === "C") clearSim();
   else if (e.key === "h" || e.key === "H") setPanel($("panel").hidden);
+  else if (e.key === "f" || e.key === "F") setFluid(!CT.fluid);
   else if (e.key === " ") { e.preventDefault(); setPaused(!S.paused); }
   else if (e.key === "m" || e.key === "M") toggleMusic();
-  else if (e.key === "v" || e.key === "V") toggleClip();
-});
+}
 window.addEventListener("keyup", e => { if (e.key === "Shift") ptr.shift = false; });
 
 /* ---------------- boot ---------------- */
-/* ---------------- defaults ---------------- */
-// Settings baked into the page itself (filled in by Claude from "Copy settings"); null = built-in values.
-const BAKED_DEFAULTS = null;
-const STORE_KEY = "emergence-studies-defaults";
+/* ---------------- settings snapshot (restored after a song portrait) ---------------- */
 function getSettings() {
   return { v: 1, mode: S.mode, pal: S.pal, P: JSON.parse(JSON.stringify(P)), look: { ...look },
-    music: { ...music }, steer: { on: SG.on, soft: SG.soft, full: SG.full, hue: SG.hue }, frames: PR.frames, recMax: REC.max };
+    music: { ...music }, steer: { on: SG.on, soft: SG.soft, full: SG.full, hue: SG.hue } };
 }
 function applySettings(o) {
   if (!o || typeof o !== "object") return;
@@ -2348,36 +2286,13 @@ function applySettings(o) {
   if (o.steer) num(SG, o.steer);
   if (MODES[o.mode]) S.mode = o.mode;
   if (Number.isInteger(o.pal) && PALETTES[o.pal]) S.pal = o.pal;
-  if ([12, 16, 24].includes(o.frames)) PR.frames = o.frames;
-  if ([10, 15, 30, 45].includes(o.recMax)) REC.max = o.recMax;
 }
 function syncAllUI() {
   applyPalette(); syncPals(); buildModeUI();
   ALLCTL.forEach(c => c._sync && c._sync());
   const set = (id, v) => { const e = document.getElementById(id); if (e) e.checked = v; };
-  set("music-beats", music.beats); set("music-steer", SG.on); syncRecBtn();
-  [...$("framechips").children].forEach(b => b.setAttribute("aria-pressed", b.textContent.startsWith(PR.frames + " ")));
+  set("music-beats", music.beats); set("music-steer", SG.on);
 }
-const BUILTIN = getSettings();
-applySettings(BAKED_DEFAULTS);
-try { const raw = localStorage.getItem(STORE_KEY); if (raw) applySettings(JSON.parse(raw)); } catch (e) {}
-$("savedef").addEventListener("click", () => {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(getSettings())); $("defnote").textContent = "Saved. The page will open with these settings in this browser."; }
-  catch (e) { $("defnote").textContent = "This browser blocked saving. Use Copy settings and paste them to Claude instead."; }
-});
-$("copydef").addEventListener("click", () => {
-  const txt = JSON.stringify(getSettings()), box = $("defbox");
-  box.value = txt;
-  const done = () => { $("defnote").textContent = "Copied. Paste it into the chat with Claude to make these the built-in defaults."; };
-  const fallback = () => { box.hidden = false; box.focus(); box.select(); $("defnote").textContent = "Select the text below, copy it, and paste it into the chat with Claude."; };
-  try { navigator.clipboard.writeText(txt).then(done, fallback); } catch (e) { fallback(); }
-});
-$("resetdef").addEventListener("click", () => {
-  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
-  applySettings(BUILTIN); applySettings(BAKED_DEFAULTS);
-  syncAllUI(); setupMode();
-  $("defnote").textContent = "Back to the original settings.";
-});
 
 syncAllUI();
 sizeCanvas(); setupMode();
